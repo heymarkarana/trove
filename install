@@ -1,0 +1,177 @@
+#!/usr/bin/env zsh
+# Trove Installer
+# Sets up Trove utilities for system-wide use
+
+set -e
+
+TROVE_ROOT="${0:A:h}"
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║              Trove - Shared Utilities Library             ║"
+echo "║                      v0.1.0-beta                           ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Determine installation directory
+INSTALL_DIR="${TROVE_ROOT}"
+echo "Installing from: ${INSTALL_DIR}"
+echo ""
+
+# Source logging to provide nice output
+if [[ -f "${INSTALL_DIR}/lib/trove_logging.zsh" ]]; then
+    source "${INSTALL_DIR}/lib/trove_logging.zsh"
+else
+    # Fallback: minimal logging
+    trove_log() { echo "[${1}] ${2}" >&2; }
+    trove_bot() { echo ""; echo "✪ ${1}" >&2; }
+    trove_running() { echo "  ✨ ${1}" >&2; }
+    trove_ok() { echo "  ✔ ${1}" >&2; }
+fi
+
+###############################################################################
+# Validation
+###############################################################################
+
+trove_bot "Validating Installation"
+
+# Check if zsh is available
+if ! command -v zsh >/dev/null 2>&1; then
+    trove_log ERROR "zsh is required but not installed"
+    echo "Please install zsh first:"
+    echo "  macOS:  brew install zsh"
+    echo "  Ubuntu: sudo apt-get install zsh"
+    exit 1
+fi
+trove_ok "zsh found: $(which zsh)"
+
+# Check directory structure
+trove_running "Checking directory structure"
+required_dirs=("bin" "lib" "config" "tests" "docs")
+for dir in "${required_dirs[@]}"; do
+    if [[ ! -d "${INSTALL_DIR}/${dir}" ]]; then
+        trove_log ERROR "Missing directory: ${dir}"
+        exit 1
+    fi
+done
+trove_ok "Directory structure valid"
+
+# Check required files
+trove_running "Checking required files"
+required_files=(
+    "lib/trove_logging.zsh"
+    "lib/trove_colors.zsh"
+    "lib/trove_helpers.zsh"
+    "lib/trove_monitoring.zsh"
+    "lib/trove_date.zsh"
+    "bin/klog"
+    "config/trove.conf"
+    "VERSION"
+)
+for file in "${required_files[@]}"; do
+    if [[ ! -f "${INSTALL_DIR}/${file}" ]]; then
+        trove_log ERROR "Missing file: ${file}"
+        exit 1
+    fi
+done
+trove_ok "Required files present"
+
+###############################################################################
+# Permissions
+###############################################################################
+
+trove_bot "Setting Permissions"
+
+# Make klog executable
+if [[ -f "${INSTALL_DIR}/bin/klog" ]]; then
+    trove_running "Making klog executable"
+    chmod +x "${INSTALL_DIR}/bin/klog"
+    trove_ok "klog is executable"
+fi
+
+# Make libraries readable
+trove_running "Setting library permissions"
+chmod 644 "${INSTALL_DIR}"/lib/*.zsh
+trove_ok "Library permissions set"
+
+###############################################################################
+# Testing
+###############################################################################
+
+trove_bot "Testing Installation"
+
+# Test sourcing logging
+trove_running "Testing logging library"
+if source "${INSTALL_DIR}/lib/trove_logging.zsh" 2>/dev/null; then
+    trove_ok "Logging library loads successfully"
+else
+    trove_log ERROR "Failed to load logging library"
+    exit 1
+fi
+
+# Test klog binary
+trove_running "Testing klog binary"
+if "${INSTALL_DIR}/bin/klog" --help >/dev/null 2>&1; then
+    trove_ok "klog binary works"
+else
+    trove_log ERROR "klog binary failed"
+    exit 1
+fi
+
+# Test color schemes
+trove_running "Testing color schemes"
+if source "${INSTALL_DIR}/lib/trove_colors.zsh" 2>/dev/null; then
+    trove_ok "Color schemes load successfully"
+else
+    trove_log ERROR "Failed to load color schemes"
+    exit 1
+fi
+
+###############################################################################
+# PATH Setup
+###############################################################################
+
+trove_bot "PATH Configuration"
+
+# Check if already in PATH
+if [[ ":$PATH:" == *":${INSTALL_DIR}/bin:"* ]]; then
+    trove_ok "Trove is already in your PATH"
+else
+    echo ""
+    trove_log INFO "To add Trove to your PATH, add this to your ~/.zshrc:"
+    echo ""
+    echo "  export PATH=\"${INSTALL_DIR}/bin:\$PATH\""
+    echo ""
+
+    # Offer to add to .zshrc
+    if [[ -t 0 ]]; then  # Only if interactive
+        printf "Add to ~/.zshrc now? [y/N]: "
+        read -r response
+
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            echo "" >> "${HOME}/.zshrc"
+            echo "# Trove - Shared Utilities Library" >> "${HOME}/.zshrc"
+            echo "export PATH=\"${INSTALL_DIR}/bin:\$PATH\"" >> "${HOME}/.zshrc"
+            trove_ok "Added to ~/.zshrc - restart your shell or run: source ~/.zshrc"
+        fi
+    fi
+fi
+
+###############################################################################
+# Success
+###############################################################################
+
+echo ""
+trove_log INFO "✅ Trove installation complete!"
+echo ""
+echo "Get started:"
+echo "  source /opt/trove/lib/trove_logging.zsh     # In shell scripts"
+echo "  klog INFO \"test message\"                    # From CLI/binaries"
+echo "  klog --help                                  # Show help"
+echo ""
+echo "Documentation:"
+echo "  /opt/trove/README.md                         # Overview"
+echo "  /opt/trove/docs/API.md                       # API reference"
+echo ""
+echo "Version: $(cat ${INSTALL_DIR}/VERSION)"
+echo ""

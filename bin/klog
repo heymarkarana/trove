@@ -1,0 +1,114 @@
+#!/usr/bin/env zsh
+# klog - Trove logging CLI for compiled applications
+# Provides command-line interface to Trove logging functions
+
+###############################################################################
+# Setup
+###############################################################################
+
+# Get Trove home directory
+TROVE_HOME="${0:A:h:h}"
+
+# Source logging library
+if [[ -f "${TROVE_HOME}/lib/trove_logging.zsh" ]]; then
+    source "${TROVE_HOME}/lib/trove_logging.zsh"
+else
+    echo "ERROR: Could not find trove_logging.zsh" >&2
+    exit 1
+fi
+
+###############################################################################
+# Help Function
+###############################################################################
+
+show_help() {
+    cat <<EOF
+klog - Trove Logging CLI
+
+Usage:
+  klog LEVEL "message"        Log a message at specified level
+  klog bot "message"          Major section header
+  klog running "message"      Configuration step
+  klog ok "message"           Success confirmation
+  klog --help                 Show this help
+
+Log Levels:
+  TRACE   - Very detailed debugging
+  DEBUG   - Detailed debugging information
+  INFO    - Informational messages (default)
+  WARN    - Warning messages
+  ERROR   - Error messages
+  FATAL   - Fatal error messages
+
+Special Commands:
+  bot      - Announce major task (bold purple ✪)
+  running  - Configuration step (orange ✨)
+  ok       - Success indicator (green ➤)
+
+Examples:
+  klog INFO "Application started"
+  klog ERROR "Connection failed"
+  klog bot "Installing Packages"
+  klog running "Configuring database"
+  klog ok "Installation complete"
+
+Environment Variables:
+  TROVE_LOG_LEVEL         - Log level filter (default: INFO)
+  TROVE_OUTPUT_DISPLAY    - Show command output (default: true)
+  TROVE_COLORSCHEME       - Color scheme (default: monokai)
+
+Exit Codes:
+  0 - Success
+  1 - Invalid usage or error
+
+For more information: /opt/trove/docs/API.md
+EOF
+}
+
+###############################################################################
+# Main Function
+###############################################################################
+
+main() {
+    # Check for help flag
+    if [[ "$#" -eq 0 || "$1" == "--help" || "$1" == "-h" ]]; then
+        show_help
+        exit 0
+    fi
+
+    # Get command/level
+    local command="$1"
+    shift
+
+    # Get message (rest of arguments)
+    local message="$*"
+
+    # Handle special commands
+    case "$command" in
+        bot)
+            trove_bot "$message"
+            ;;
+        running)
+            trove_running "$message"
+            ;;
+        ok)
+            trove_ok "$message"
+            ;;
+        TRACE|DEBUG|INFO|WARN|ERROR|FATAL)
+            trove_log "$command" "$message"
+            ;;
+        *)
+            echo "ERROR: Unknown command or log level: $command" >&2
+            echo "Use 'klog --help' for usage information" >&2
+            exit 1
+            ;;
+    esac
+
+    exit 0
+}
+
+###############################################################################
+# Execute
+###############################################################################
+
+main "$@"

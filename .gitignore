@@ -1,0 +1,19 @@
+# Trove .gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Test artifacts
+tests/*.log
+tests/tmp/
+
+# User config overrides (keep template)
+config/trove.local.conf
