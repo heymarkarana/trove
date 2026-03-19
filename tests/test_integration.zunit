@@ -1,0 +1,294 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Source all libraries
+  source "/opt/trove/lib/trove_logging.zsh"
+  source "/opt/trove/lib/trove_colors.zsh"
+  source "/opt/trove/lib/trove_helpers.zsh"
+  source "/opt/trove/lib/trove_monitoring.zsh"
+  source "/opt/trove/lib/trove_date.zsh"
+
+  # Create temp directory
+  TROVE_TEST_DIR="/tmp/trove_integration_$$"
+  mkdir -p "${TROVE_TEST_DIR}"
+}
+
+@teardown {
+  rm -rf "${TROVE_TEST_DIR}"
+}
+
+# klog binary tests
+
+@test 'klog binary exists and is executable' {
+  run test -x /opt/trove/bin/klog
+
+  assert $state equals 0
+}
+
+@test 'klog INFO works from command line' {
+  run /opt/trove/bin/klog INFO "test message"
+
+  assert $state equals 0
+  assert "$output" contains "test message"
+}
+
+@test 'klog ERROR works from command line' {
+  run /opt/trove/bin/klog ERROR "error message"
+
+  assert $state equals 0
+  assert "$output" contains "error message"
+}
+
+@test 'klog bot works from command line' {
+  run /opt/trove/bin/klog bot "deployment started"
+
+  assert $state equals 0
+  assert "$output" contains "deployment started"
+}
+
+@test 'klog running works from command line' {
+  run /opt/trove/bin/klog running "configuring"
+
+  assert $state equals 0
+  assert "$output" contains "configuring"
+}
+
+@test 'klog rejects invalid command' {
+  run /opt/trove/bin/klog invalid "test"
+
+  assert $state equals 1
+  assert "$output" contains "Unknown command"
+}
+
+@test 'klog ok works from command line' {
+  run /opt/trove/bin/klog ok "completed"
+
+  assert $state equals 0
+  assert "$output" contains "completed"
+}
+
+# Library independence tests
+
+@test 'logging works without other libraries' {
+  # Start fresh shell and only load logging
+  run zsh -c 'source /opt/trove/lib/trove_logging.zsh && trove_log INFO "test"'
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+@test 'colors work without other libraries' {
+  run zsh -c 'source /opt/trove/lib/trove_colors.zsh && echo ${COL_RED}'
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+@test 'helpers work without other libraries' {
+  run zsh -c 'source /opt/trove/lib/trove_helpers.zsh && trove_command_exists ls'
+
+  assert $state equals 0
+}
+
+@test 'monitoring works without other libraries' {
+  run zsh -c 'source /opt/trove/lib/trove_monitoring.zsh && trove_get_hostname'
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+@test 'date works without other libraries' {
+  run zsh -c 'source /opt/trove/lib/trove_date.zsh && trove_timestamp_iso'
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+# Cross-library integration tests
+
+@test 'color scheme can be set before loading logging' {
+  run zsh -c '
+    export TROVE_COLORSCHEME="nord"
+    source /opt/trove/lib/trove_colors.zsh
+    source /opt/trove/lib/trove_logging.zsh
+    echo ${TROVE_CURRENT_COLORSCHEME}
+  '
+
+  assert $state equals 0
+  assert "$output" contains "nord"
+}
+
+@test 'logging with colors works' {
+  run zsh -c '
+    source /opt/trove/lib/trove_colors.zsh
+    source /opt/trove/lib/trove_logging.zsh
+    trove_log INFO "colored message"
+  '
+
+  assert $state equals 0
+  assert "$output" contains "colored message"
+}
+
+@test 'logging with timestamps works' {
+  run zsh -c '
+    source /opt/trove/lib/trove_date.zsh
+    source /opt/trove/lib/trove_logging.zsh
+    timestamp=$(trove_timestamp_iso)
+    trove_log INFO "Message at ${timestamp}"
+  '
+
+  assert $state equals 0
+  assert "$output" contains "Message at"
+}
+
+@test 'monitoring with logging works' {
+  run zsh -c '
+    export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
+    source /opt/trove/lib/trove_monitoring.zsh
+    source /opt/trove/lib/trove_logging.zsh
+    hostname=$(trove_get_hostname)
+    trove_log INFO "Hostname: ${hostname}"
+  '
+
+  assert $state equals 0
+  assert "$output" contains "Hostname:"
+}
+
+@test 'helpers with logging works' {
+  run zsh -c '
+    source /opt/trove/lib/trove_helpers.zsh
+    source /opt/trove/lib/trove_logging.zsh
+    if trove_command_exists ls; then
+      trove_log INFO "ls command found"
+    fi
+  '
+
+  assert $state equals 0
+  assert "$output" contains "ls command found"
+}
+
+# Real-world workflow tests
+
+@test 'complete workflow: check system and log results' {
+  run zsh -c '
+    source /opt/trove/lib/trove_colors.zsh
+    source /opt/trove/lib/trove_logging.zsh
+    source /opt/trove/lib/trove_monitoring.zsh
+    source /opt/trove/lib/trove_date.zsh
+
+    trove_set_colorscheme "monokai"
+    timestamp=$(trove_timestamp_iso)
+    hostname=$(trove_get_hostname)
+    disk_usage=$(trove_get_disk_usage "/")
+
+    trove_log INFO "System check at ${timestamp}"
+    trove_log INFO "Host: ${hostname}"
+    trove_log INFO "Disk usage: ${disk_usage}%"
+  '
+
+  assert $state equals 0
+  assert "$output" contains "System check"
+  assert "$output" contains "Host:"
+  assert "$output" contains "Disk usage:"
+}
+
+@test 'complete workflow: validate paths and report' {
+  touch "${TROVE_TEST_DIR}/testfile"
+
+  run zsh -c "
+    source /opt/trove/lib/trove_helpers.zsh
+    source /opt/trove/lib/trove_logging.zsh
+
+    if trove_path_exists '${TROVE_TEST_DIR}/testfile'; then
+      trove_log INFO 'File exists'
+    else
+      trove_log ERROR 'File not found'
+    fi
+  "
+
+  assert $state equals 0
+  assert "$output" contains "File exists"
+}
+
+@test 'complete workflow: measure duration and format' {
+  run zsh -c '
+    source /opt/trove/lib/trove_date.zsh
+    source /opt/trove/lib/trove_logging.zsh
+
+    start=$(trove_timestamp_unix)
+    sleep 0.1
+    end=$(trove_timestamp_unix)
+    duration=$((end - start))
+
+    formatted=$(trove_duration_format ${duration})
+    trove_log INFO "Operation took: ${formatted}"
+  '
+
+  assert $state equals 0
+  assert "$output" contains "Operation took:"
+}
+
+# Configuration integration tests
+
+@test 'config file exists' {
+  run test -f /opt/trove/config/trove.conf
+
+  assert $state equals 0
+}
+
+@test 'can source config file' {
+  run zsh -c 'source /opt/trove/config/trove.conf && echo "loaded"'
+
+  assert $state equals 0
+  assert "$output" contains "loaded"
+}
+
+@test 'config and libraries work together' {
+  run zsh -c '
+    source /opt/trove/config/trove.conf
+    source /opt/trove/lib/trove_logging.zsh
+    trove_log INFO "Config loaded"
+  '
+
+  assert $state equals 0
+  assert "$output" contains "Config loaded"
+}
+
+# Documentation tests
+
+@test 'README exists' {
+  run test -f /opt/trove/README.md
+
+  assert $state equals 0
+}
+
+@test 'API documentation exists' {
+  run test -f /opt/trove/docs/API.md
+
+  assert $state equals 0
+}
+
+@test 'examples exist' {
+  run test -f /opt/trove/examples/basic_logging.sh
+
+  assert $state equals 0
+}
+
+@test 'example script is executable' {
+  run test -x /opt/trove/examples/basic_logging.sh
+
+  assert $state equals 0
+}
+
+@test 'basic logging example runs' {
+  run /opt/trove/examples/basic_logging.sh
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+@test 'monitoring example exists and is executable' {
+  run test -x /opt/trove/examples/monitoring_example.sh
+
+  assert $state equals 0
+}

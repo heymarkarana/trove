@@ -1,0 +1,120 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Source the colors library
+  source "/opt/trove/lib/trove_colors.zsh"
+}
+
+@teardown {
+  # Reset to default scheme
+  trove_set_colorscheme "monokai"
+}
+
+@test 'default color scheme is monokai' {
+  assert "${TROVE_CURRENT_COLORSCHEME}" equals "monokai"
+}
+
+@test 'monokai colors are defined' {
+  trove_set_colorscheme "monokai"
+
+  assert "${COL_RED}" is_not_empty
+  assert "${COL_GREEN}" is_not_empty
+  assert "${COL_YELLOW}" is_not_empty
+  assert "${COL_BLUE}" is_not_empty
+  assert "${COL_RESET}" is_not_empty
+}
+
+@test 'solarized colors are defined' {
+  trove_set_colorscheme "solarized"
+
+  assert "${TROVE_CURRENT_COLORSCHEME}" equals "solarized"
+  assert "${COL_RED}" is_not_empty
+  assert "${COL_GREEN}" is_not_empty
+  assert "${COL_YELLOW}" is_not_empty
+  assert "${COL_BLUE}" is_not_empty
+}
+
+@test 'nord colors are defined' {
+  trove_set_colorscheme "nord"
+
+  assert "${TROVE_CURRENT_COLORSCHEME}" equals "nord"
+  assert "${COL_RED}" is_not_empty
+  assert "${COL_GREEN}" is_not_empty
+  assert "${COL_YELLOW}" is_not_empty
+  assert "${COL_BLUE}" is_not_empty
+}
+
+@test 'dracula colors are defined' {
+  trove_set_colorscheme "dracula"
+
+  assert "${TROVE_CURRENT_COLORSCHEME}" equals "dracula"
+  assert "${COL_RED}" is_not_empty
+  assert "${COL_GREEN}" is_not_empty
+  assert "${COL_YELLOW}" is_not_empty
+  assert "${COL_BLUE}" is_not_empty
+}
+
+@test 'gruvbox colors are defined' {
+  trove_set_colorscheme "gruvbox"
+
+  assert "${TROVE_CURRENT_COLORSCHEME}" equals "gruvbox"
+  assert "${COL_RED}" is_not_empty
+  assert "${COL_GREEN}" is_not_empty
+  assert "${COL_YELLOW}" is_not_empty
+  assert "${COL_BLUE}" is_not_empty
+}
+
+@test 'can switch between color schemes' {
+  trove_set_colorscheme "monokai"
+  local monokai_red="${COL_RED}"
+
+  trove_set_colorscheme "solarized"
+  local solarized_red="${COL_RED}"
+
+  # Colors should be different - use run with test command
+  run test "${monokai_red}" != "${solarized_red}"
+  assert $state equals 0
+}
+
+@test 'invalid color scheme returns error' {
+  run trove_set_colorscheme "invalid_scheme"
+
+  assert $state equals 1
+  assert "$output" contains "Unknown color scheme"
+}
+
+@test 'COL_RESET is defined' {
+  trove_set_colorscheme "monokai"
+  assert "${COL_RESET}" is_not_empty
+}
+
+@test 'COL_BOLD_PURPLE is defined' {
+  trove_set_colorscheme "monokai"
+  assert "${COL_BOLD_PURPLE}" is_not_empty
+}
+
+@test 'COL_GRAY is defined' {
+  trove_set_colorscheme "monokai"
+  assert "${COL_GRAY}" is_not_empty
+}
+
+@test 'trove_show_colorschemes lists all schemes' {
+  run trove_show_colorschemes
+
+  assert $state equals 0
+  assert "$output" contains "monokai"
+  assert "$output" contains "solarized"
+  assert "$output" contains "nord"
+  assert "$output" contains "dracula"
+  assert "$output" contains "gruvbox"
+}
+
+@test 'color scheme persists after function calls' {
+  trove_set_colorscheme "nord"
+
+  # Call another function
+  trove_show_colorschemes > /dev/null
+
+  # Color scheme should still be nord
+  assert "${TROVE_CURRENT_COLORSCHEME}" equals "nord"
+}

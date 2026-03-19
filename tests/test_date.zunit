@@ -1,0 +1,167 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Source the date library
+  source "/opt/trove/lib/trove_date.zsh"
+  export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
+}
+
+# Timestamp tests
+
+@test 'trove_timestamp_iso function exists' {
+  type trove_timestamp_iso > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_timestamp_unix function exists' {
+  type trove_timestamp_unix > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_timestamp_format function exists' {
+  type trove_timestamp_format > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_date_today function exists' {
+  type trove_date_today > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_time_now function exists' {
+  type trove_time_now > /dev/null
+  assert $? equals 0
+}
+
+# Date arithmetic tests
+
+@test 'trove_date_add_days function exists' {
+  type trove_date_add_days > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_date_sub_days function exists' {
+  type trove_date_sub_days > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_date_diff function exists' {
+  type trove_date_diff > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_date_days_ago function exists' {
+  type trove_date_days_ago > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_date_days_from_now function exists' {
+  type trove_date_days_from_now > /dev/null
+  assert $? equals 0
+}
+
+# Duration tests
+
+@test 'trove_duration_format function exists' {
+  type trove_duration_format > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_duration_seconds function exists' {
+  type trove_duration_seconds > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_duration_hms function exists' {
+  type trove_duration_hms > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_measure_duration function exists' {
+  type trove_measure_duration > /dev/null
+  assert $? equals 0
+}
+
+# Timezone tests
+
+@test 'trove_get_timezone function exists' {
+  type trove_get_timezone > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_utc_offset function exists' {
+  type trove_get_utc_offset > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_convert_timezone function exists' {
+  type trove_convert_timezone > /dev/null
+  assert $? equals 0
+}
+
+# Validation tests
+
+@test 'trove_is_valid_date function exists' {
+  type trove_is_valid_date > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_is_valid_timestamp function exists' {
+  type trove_is_valid_timestamp > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_is_past function exists' {
+  type trove_is_past > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_is_future function exists' {
+  type trove_is_future > /dev/null
+  assert $? equals 0
+}
+
+# Parsing tests
+
+@test 'trove_parse_iso function exists' {
+  type trove_parse_iso > /dev/null
+  assert $? equals 0
+}
+
+# Day boundaries
+
+@test 'trove_start_of_today function exists' {
+  type trove_start_of_today > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_end_of_today function exists' {
+  type trove_end_of_today > /dev/null
+  assert $? equals 0
+}
+
+# File operations
+
+@test 'trove_file_age_days function exists' {
+  type trove_file_age_days > /dev/null
+  assert $? equals 0
+}
+
+# Logging timestamps
+
+@test 'trove_log_timestamp function exists' {
+  type trove_log_timestamp > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_log_date function exists' {
+  type trove_log_date > /dev/null
+  assert $? equals 0
+}
+
+# Help
+
+@test 'trove_date_help function exists' {
+  type trove_date_help > /dev/null
+  assert $? equals 0
+}

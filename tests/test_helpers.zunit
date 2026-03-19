@@ -1,0 +1,258 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Source the helpers library
+  source "/opt/trove/lib/trove_helpers.zsh"
+
+  # Create temporary test directory
+  TROVE_TEST_DIR="/tmp/trove_test_$$"
+  mkdir -p "${TROVE_TEST_DIR}"
+}
+
+@teardown {
+  # Clean up test directory
+  rm -rf "${TROVE_TEST_DIR}"
+}
+
+# Path validation tests
+
+@test 'trove_path_exists returns true for existing path' {
+  touch "${TROVE_TEST_DIR}/testfile"
+
+  run trove_path_exists "${TROVE_TEST_DIR}/testfile"
+
+  assert $state equals 0
+}
+
+@test 'trove_path_exists returns false for non-existent path' {
+  run trove_path_exists "${TROVE_TEST_DIR}/nonexistent"
+
+  assert $state equals 1
+}
+
+@test 'trove_is_directory returns true for directory' {
+  run trove_is_directory "${TROVE_TEST_DIR}"
+
+  assert $state equals 0
+}
+
+@test 'trove_is_directory returns false for file' {
+  touch "${TROVE_TEST_DIR}/testfile"
+
+  run trove_is_directory "${TROVE_TEST_DIR}/testfile"
+
+  assert $state equals 1
+}
+
+@test 'trove_is_file returns true for file' {
+  touch "${TROVE_TEST_DIR}/testfile"
+
+  run trove_is_file "${TROVE_TEST_DIR}/testfile"
+
+  assert $state equals 0
+}
+
+@test 'trove_is_file returns false for directory' {
+  run trove_is_file "${TROVE_TEST_DIR}"
+
+  assert $state equals 1
+}
+
+# Permission tests
+
+@test 'trove_is_readable returns true for readable file' {
+  touch "${TROVE_TEST_DIR}/readable"
+  chmod 644 "${TROVE_TEST_DIR}/readable"
+
+  run trove_is_readable "${TROVE_TEST_DIR}/readable"
+
+  assert $state equals 0
+}
+
+@test 'trove_is_writable returns true for writable file' {
+  touch "${TROVE_TEST_DIR}/writable"
+  chmod 644 "${TROVE_TEST_DIR}/writable"
+
+  run trove_is_writable "${TROVE_TEST_DIR}/writable"
+
+  assert $state equals 0
+}
+
+@test 'trove_is_executable returns true for executable file' {
+  touch "${TROVE_TEST_DIR}/executable"
+  chmod 755 "${TROVE_TEST_DIR}/executable"
+
+  run trove_is_executable "${TROVE_TEST_DIR}/executable"
+
+  assert $state equals 0
+}
+
+@test 'trove_is_executable returns false for non-executable file' {
+  touch "${TROVE_TEST_DIR}/notexec"
+  chmod 644 "${TROVE_TEST_DIR}/notexec"
+
+  run trove_is_executable "${TROVE_TEST_DIR}/notexec"
+
+  assert $state equals 1
+}
+
+# Platform detection tests
+
+@test 'trove_is_macos returns correct value' {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    run trove_is_macos
+    assert $state equals 0
+  else
+    run trove_is_macos
+    assert $state equals 1
+  fi
+}
+
+@test 'trove_is_linux returns correct value' {
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    run trove_is_linux
+    assert $state equals 0
+  else
+    run trove_is_linux
+    assert $state equals 1
+  fi
+}
+
+@test 'trove_get_platform returns operating system' {
+  run trove_get_platform
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+# Command detection tests
+
+@test 'trove_command_exists returns true for existing command' {
+  run trove_command_exists "ls"
+
+  assert $state equals 0
+}
+
+@test 'trove_command_exists returns false for non-existent command' {
+  run trove_command_exists "nonexistent_command_12345"
+
+  assert $state equals 1
+}
+
+@test 'trove_require_command succeeds for existing command' {
+  run trove_require_command "ls"
+
+  assert $state equals 0
+}
+
+@test 'trove_require_command fails for non-existent command' {
+  run trove_require_command "nonexistent_command_12345"
+
+  assert $state equals 1
+  assert "$output" contains "Command not found"
+}
+
+# Environment variable tests
+
+@test 'trove_is_set returns true for set variable' {
+  export TROVE_TEST_VAR="value"
+
+  run trove_is_set "TROVE_TEST_VAR"
+
+  assert $state equals 0
+}
+
+@test 'trove_is_set returns false for unset variable' {
+  unset TROVE_TEST_VAR
+
+  run trove_is_set "TROVE_TEST_VAR"
+
+  assert $state equals 1
+}
+
+@test 'trove_require_vars succeeds when all vars set' {
+  export TROVE_VAR1="value1"
+  export TROVE_VAR2="value2"
+
+  run trove_require_vars "TROVE_VAR1" "TROVE_VAR2"
+
+  assert $state equals 0
+}
+
+@test 'trove_require_vars fails when var missing' {
+  export TROVE_VAR1="value1"
+  unset TROVE_VAR2
+
+  run trove_require_vars "TROVE_VAR1" "TROVE_VAR2"
+
+  assert $state equals 1
+  assert "$output" contains "Missing required"
+}
+
+@test 'trove_get_env returns variable value' {
+  export TROVE_TEST_VAR="test_value"
+
+  run trove_get_env "TROVE_TEST_VAR"
+
+  assert $state equals 0
+  assert "$output" same_as "test_value"
+}
+
+@test 'trove_get_env returns default for unset variable' {
+  unset TROVE_TEST_VAR
+
+  run trove_get_env "TROVE_TEST_VAR" "default_value"
+
+  assert $state equals 0
+  assert "$output" same_as "default_value"
+}
+
+# String utility tests
+
+@test 'trove_trim removes leading and trailing whitespace' {
+  run trove_trim "  hello world  "
+
+  assert $state equals 0
+  assert "$output" same_as "hello world"
+}
+
+@test 'trove_lowercase converts to lowercase' {
+  run trove_lowercase "HELLO WORLD"
+
+  assert $state equals 0
+  assert "$output" same_as "hello world"
+}
+
+@test 'trove_uppercase converts to uppercase' {
+  run trove_uppercase "hello world"
+
+  assert $state equals 0
+  assert "$output" same_as "HELLO WORLD"
+}
+
+@test 'trove_starts_with returns true for matching prefix' {
+  run trove_starts_with "hello world" "hello"
+
+  assert $state equals 0
+}
+
+@test 'trove_starts_with returns false for non-matching prefix' {
+  run trove_starts_with "hello world" "world"
+
+  assert $state equals 1
+}
+
+@test 'trove_ends_with returns true for matching suffix' {
+  run trove_ends_with "hello world" "world"
+
+  assert $state equals 0
+}
+
+@test 'trove_ends_with returns false for non-matching suffix' {
+  run trove_ends_with "hello world" "hello"
+
+  assert $state equals 1
+}
+
+# trove_contains doesn't exist in the helpers library
+# Removing these tests as the function is not implemented

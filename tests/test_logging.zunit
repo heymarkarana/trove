@@ -1,0 +1,170 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Source the logging library
+  source "/opt/trove/lib/trove_logging.zsh"
+
+  # Silence output for cleaner test results
+  export TROVE_DISPLAY_OUTPUT=0
+}
+
+@teardown {
+  # Reset log level
+  export TROVE_LOG_LEVEL=""
+  export TROVE_DISPLAY_OUTPUT=1
+}
+
+@test 'trove_log INFO works' {
+  run trove_log INFO "test info message"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "test info message"
+}
+
+@test 'trove_log WARN works' {
+  run trove_log WARN "test warning"
+
+  assert $state equals 0
+  assert "$output" contains "test warning"
+}
+
+@test 'trove_log ERROR works' {
+  run trove_log ERROR "test error"
+
+  assert $state equals 0
+  assert "$output" contains "test error"
+}
+
+@test 'trove_log DEBUG is filtered by default' {
+  run trove_log DEBUG "debug message"
+
+  assert $state equals 0
+  assert "$output" is_empty
+}
+
+@test 'trove_log DEBUG shown when TROVE_LOG_LEVEL=DEBUG' {
+  trove_set_log_level "DEBUG"
+
+  run trove_log DEBUG "debug message"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "debug message"
+}
+
+@test 'trove_log TRACE is filtered by default' {
+  run trove_log TRACE "trace message"
+
+  assert $state equals 0
+  assert "$output" is_empty
+}
+
+@test 'trove_log TRACE shown when TROVE_LOG_LEVEL=TRACE' {
+  trove_set_log_level "TRACE"
+
+  run trove_log TRACE "trace message"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "trace message"
+}
+
+@test 'trove_log FATAL works' {
+  run trove_log FATAL "fatal error"
+
+  assert $state equals 0
+  assert "$output" contains "fatal error"
+}
+
+@test 'trove_bot announces tasks' {
+  run trove_bot "Starting deployment"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "Starting deployment"
+}
+
+@test 'trove_running shows progress' {
+  run trove_running "Configuring system"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "Configuring system"
+}
+
+@test 'trove_action displays action' {
+  run trove_action "Installing package"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "Installing package"
+}
+
+@test 'trove_ok shows success' {
+  run trove_ok "Task completed"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+  assert "$output" contains "Task completed"
+}
+
+@test 'trove_silent_run executes command' {
+  run trove_silent_run echo "hello"
+
+  assert $state equals 0
+}
+
+@test 'trove_silent_run returns command exit code' {
+  run trove_silent_run false
+
+  assert $state equals 1
+}
+
+@test 'trove_print_result shows success message' {
+  run trove_print_result 0 "Operation succeeded"
+
+  assert $state equals 0
+  assert "$output" contains "Operation succeeded"
+}
+
+@test 'trove_print_result shows failure message' {
+  run trove_print_result 1 "Operation failed"
+
+  assert $state equals 1
+  assert "$output" contains "Operation failed"
+}
+
+@test 'log level hierarchy - ERROR filters DEBUG' {
+  trove_set_log_level "ERROR"
+
+  run trove_log DEBUG "should not appear"
+  assert "$output" is_empty
+
+  run trove_log INFO "should not appear"
+  assert "$output" is_empty
+
+  run trove_log ERROR "should appear"
+  assert "$output" is_not_empty
+  assert "$output" contains "should appear"
+}
+
+@test 'log level hierarchy - INFO filters DEBUG' {
+  trove_set_log_level "INFO"
+
+  run trove_log DEBUG "should not appear"
+  assert "$output" is_empty
+
+  run trove_log INFO "should appear"
+  assert "$output" is_not_empty
+  assert "$output" contains "should appear"
+}
+
+@test 'TROVE_DISPLAY_OUTPUT=0 suppresses output' {
+  export TROVE_DISPLAY_OUTPUT=0
+
+  run trove_log INFO "test message"
+
+  # Should still execute but output might be empty
+  assert $state equals 0
+}

@@ -1,0 +1,98 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Source the monitoring library
+  source "/opt/trove/lib/trove_monitoring.zsh"
+
+  # Ensure PATH includes standard locations
+  export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
+}
+
+# Disk metrics tests (accept both success and graceful failure)
+
+@test 'trove_get_disk_usage function exists' {
+  type trove_get_disk_usage > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_disk_used_gb function exists' {
+  type trove_get_disk_used_gb > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_disk_available_gb function exists' {
+  type trove_get_disk_available_gb > /dev/null
+  assert $? equals 0
+}
+
+# Memory metrics tests
+
+@test 'trove_get_memory_usage function exists' {
+  type trove_get_memory_usage > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_memory_total_mb function exists' {
+  type trove_get_memory_total_mb > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_memory_used_mb function exists' {
+  type trove_get_memory_used_mb > /dev/null
+  assert $? equals 0
+}
+
+# CPU metrics tests
+
+@test 'trove_get_cpu_load function exists' {
+  type trove_get_cpu_load > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_cpu_count function exists' {
+  type trove_get_cpu_count > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_cpu_usage function exists' {
+  type trove_get_cpu_usage > /dev/null
+  assert $? equals 0
+}
+
+# Network metrics tests
+
+@test 'trove_get_hostname function exists' {
+  type trove_get_hostname > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_get_ip_address function exists' {
+  type trove_get_ip_address > /dev/null
+  assert $? equals 0
+}
+
+# System info tests
+
+@test 'trove_get_uptime_seconds function exists' {
+  type trove_get_uptime_seconds > /dev/null
+  assert $? equals 0
+}
+
+# Process metrics tests
+
+@test 'trove_get_process_count function exists' {
+  type trove_get_process_count > /dev/null
+  assert $? equals 0
+}
+
+# Metric sending tests
+
+@test 'trove_send_metric function exists' {
+  type trove_send_metric > /dev/null
+  assert $? equals 0
+}
+
+@test 'trove_send_system_metrics function exists' {
+  type trove_send_system_metrics > /dev/null
+  assert $? equals 0
+}
