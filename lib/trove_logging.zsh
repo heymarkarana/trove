@@ -6,7 +6,7 @@
 # Sudo User Detection
 ###############################################################################
 # Determine the logged-in user's home directory when running with sudo
-if [[ -n "$SUDO_USER" ]]; then
+if [[ -n "${SUDO_USER:-}" ]]; then
     TROVE_ORIGINAL_USER_HOME=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
     if [[ -z "$TROVE_ORIGINAL_USER_HOME" ]]; then
         # Fallback for macOS which doesn't have getent
@@ -35,7 +35,7 @@ TROVE_OUTPUT_DISPLAY_INTERNAL="${TROVE_OUTPUT_DISPLAY}"
 # Load Color Scheme
 ###############################################################################
 # Source colors if not already loaded
-if [[ -z "$COL_RESET" ]]; then
+if [[ -z "${COL_RESET:-}" ]]; then
     TROVE_LIB_DIR="${0:A:h}"
     if [[ -f "${TROVE_LIB_DIR}/trove_colors.zsh" ]]; then
         source "${TROVE_LIB_DIR}/trove_colors.zsh"

@@ -128,6 +128,196 @@ else
 fi
 
 ###############################################################################
+# Central Registry Setup
+###############################################################################
+
+trove_bot "Central Application Registry"
+
+# Create registry infrastructure if it doesn't exist
+KAPPS_DIR="/opt/.config/kapps"
+KAPPS_REGISTRY="${KAPPS_DIR}/registry.txt"
+KAPPS_LOCATIONS="${KAPPS_DIR}/locations.zsh"
+
+if [[ ! -d "$KAPPS_DIR" ]]; then
+    trove_running "Creating registry directory: ${KAPPS_DIR}"
+
+    # Create directory
+    if sudo mkdir -p "$KAPPS_DIR" 2>/dev/null; then
+        # Check for kgroup and set ownership
+        if getent group kgroup &>/dev/null || dscl . -read /Groups/kgroup &>/dev/null 2>&1; then
+            trove_running "Setting ownership to root:kgroup (shared access)"
+            sudo chown root:kgroup "$KAPPS_DIR"
+            sudo chmod 2775 "$KAPPS_DIR"  # rwxrwsr-x with setgid
+        else
+            sudo chown root:wheel "$KAPPS_DIR"
+            sudo chmod 755 "$KAPPS_DIR"
+        fi
+        trove_ok "Registry directory created"
+    else
+        trove_log WARN "Could not create ${KAPPS_DIR} - skipping registry setup"
+    fi
+fi
+
+# Install locations.zsh library if it doesn't exist
+if [[ ! -f "$KAPPS_LOCATIONS" ]]; then
+    trove_running "Installing registry library"
+
+    # Download or copy locations.zsh
+    # For now, we'll create it inline
+    sudo tee "$KAPPS_LOCATIONS" > /dev/null << 'REGISTRY_EOF'
+#!/usr/bin/env zsh
+# ══════════════════════════════════════════════════════════════════════════════
+# Central Application Registry for /opt installations
+# ══════════════════════════════════════════════════════════════════════════════
+# Location: /opt/.config/kapps/locations.zsh
+# Created by: Trove installer
+# ══════════════════════════════════════════════════════════════════════════════
+
+KAPPS_REGISTRY_FILE="/opt/.config/kapps/registry.txt"
+KAPPS_REGISTRY_LOCK="/opt/.config/kapps/.registry.lock"
+
+kapps_register() {
+    local app_name="$1"
+    local user="$2"
+    local install_path="$3"
+
+    [[ -z "$app_name" || -z "$user" || -z "$install_path" ]] && {
+        echo "Usage: kapps_register <app_name> <user> <install_path>" >&2
+        return 1
+    }
+
+    [[ ! -e "$install_path" ]] && {
+        echo "Error: Install path does not exist: $install_path" >&2
+        return 1
+    }
+
+    if [[ ! -f "$KAPPS_REGISTRY_FILE" ]]; then
+        sudo mkdir -p "$(dirname "$KAPPS_REGISTRY_FILE")" 2>/dev/null
+        sudo touch "$KAPPS_REGISTRY_FILE" 2>/dev/null
+        sudo chmod 664 "$KAPPS_REGISTRY_FILE" 2>/dev/null
+    fi
+
+    local entry="${app_name}:${user}:${install_path}"
+    local lock_fd
+
+    if command -v flock &>/dev/null; then
+        exec {lock_fd}>"$KAPPS_REGISTRY_LOCK"
+        flock -x "$lock_fd" 2>/dev/null
+    fi
+
+    if [[ -f "$KAPPS_REGISTRY_FILE" ]]; then
+        local temp_file=$(mktemp)
+        grep -v "^${app_name}:${user}:" "$KAPPS_REGISTRY_FILE" > "$temp_file" 2>/dev/null || true
+        sudo mv "$temp_file" "$KAPPS_REGISTRY_FILE"
+    fi
+
+    echo "$entry" | sudo tee -a "$KAPPS_REGISTRY_FILE" >/dev/null
+    [[ -n "$lock_fd" ]] && exec {lock_fd}>&-
+
+    return 0
+}
+
+kapps_lookup() {
+    local app_name="$1"
+    local user="${2:-$(whoami)}"
+
+    [[ -z "$app_name" ]] && {
+        echo "Usage: kapps_lookup <app_name> [user]" >&2
+        return 1
+    }
+
+    [[ ! -f "$KAPPS_REGISTRY_FILE" ]] && return 1
+
+    local result=$(grep "^${app_name}:${user}:" "$KAPPS_REGISTRY_FILE" 2>/dev/null | head -n1 | cut -d: -f3)
+
+    if [[ -z "$result" && "$user" != "root" ]]; then
+        result=$(grep "^${app_name}:root:" "$KAPPS_REGISTRY_FILE" 2>/dev/null | head -n1 | cut -d: -f3)
+    fi
+
+    [[ -n "$result" ]] && echo "$result" && return 0
+    return 1
+}
+
+kapps_list() {
+    local app_name="$1"
+
+    [[ ! -f "$KAPPS_REGISTRY_FILE" ]] && {
+        echo "No applications registered" >&2
+        return 1
+    }
+
+    if [[ -n "$app_name" ]]; then
+        grep "^${app_name}:" "$KAPPS_REGISTRY_FILE" 2>/dev/null || {
+            echo "No registrations found for: $app_name" >&2
+            return 1
+        }
+    else
+        cat "$KAPPS_REGISTRY_FILE"
+    fi
+}
+
+kapps_remove() {
+    local app_name="$1"
+    local user="${2:-$(whoami)}"
+
+    [[ -z "$app_name" ]] && {
+        echo "Usage: kapps_remove <app_name> [user]" >&2
+        return 1
+    }
+
+    [[ ! -f "$KAPPS_REGISTRY_FILE" ]] && return 0
+
+    local temp_file=$(mktemp)
+    grep -v "^${app_name}:${user}:" "$KAPPS_REGISTRY_FILE" > "$temp_file" 2>/dev/null || true
+    sudo mv "$temp_file" "$KAPPS_REGISTRY_FILE"
+
+    return 0
+}
+
+kapps_verify() {
+    local app_name="$1"
+    local user="${2:-$(whoami)}"
+
+    local install_path=$(kapps_lookup "$app_name" "$user")
+    [[ -z "$install_path" ]] && return 1
+
+    [[ -e "$install_path" ]] && return 0
+    return 1
+}
+
+kapps_has_kgroup() {
+    getent group kgroup &>/dev/null || dscl . -read /Groups/kgroup &>/dev/null 2>&1
+}
+
+kapps_recommended_ownership() {
+    if kapps_has_kgroup; then
+        echo "root:kgroup"
+    else
+        echo "root:wheel"
+    fi
+}
+
+kapps_mkdir() {
+    local path="$1"
+    [[ -z "$path" ]] && return 1
+
+    sudo mkdir -p "$path" || return 1
+
+    local ownership=$(kapps_recommended_ownership)
+    sudo chown "$ownership" "$path"
+    sudo chmod 2775 "$path"
+
+    return 0
+}
+REGISTRY_EOF
+
+    sudo chmod 664 "$KAPPS_LOCATIONS"
+    trove_ok "Registry library installed"
+else
+    trove_ok "Registry library already exists"
+fi
+
+###############################################################################
 # PATH Setup
 ###############################################################################
 
@@ -158,6 +348,39 @@ else
 fi
 
 ###############################################################################
+# Registry Registration
+###############################################################################
+
+trove_bot "Registry Registration"
+
+# Register in central kapps registry
+if [[ -f "/opt/.config/kapps/locations.zsh" ]]; then
+    source "/opt/.config/kapps/locations.zsh"
+
+    # Determine ownership
+    INSTALL_USER="$(stat -f '%Su' "$INSTALL_DIR" 2>/dev/null || stat -c '%U' "$INSTALL_DIR" 2>/dev/null)"
+    [[ -z "$INSTALL_USER" ]] && INSTALL_USER="$(whoami)"
+
+    if kapps_register "trove" "$INSTALL_USER" "$INSTALL_DIR"; then
+        trove_ok "Registered in /opt/.config/kapps/registry.txt"
+
+        # Suggest kgroup ownership for shared installations
+        if kapps_has_kgroup && [[ "$INSTALL_DIR" == /opt/* ]]; then
+            CURRENT_GROUP="$(stat -f '%Sg' "$INSTALL_DIR" 2>/dev/null || stat -c '%G' "$INSTALL_DIR" 2>/dev/null)"
+            if [[ "$CURRENT_GROUP" != "kgroup" ]]; then
+                echo ""
+                trove_log INFO "💡 Tip: For shared access, set ownership to kgroup:"
+                echo "   sudo chown -R ${INSTALL_USER}:kgroup ${INSTALL_DIR}"
+                echo "   sudo chmod -R g+w ${INSTALL_DIR}"
+            fi
+        fi
+    fi
+else
+    trove_log INFO "Central registry not found - skipping registration"
+    trove_log INFO "Create registry: sudo mkdir -p /opt/.config/kapps"
+fi
+
+###############################################################################
 # Success
 ###############################################################################
 
@@ -165,13 +388,13 @@ echo ""
 trove_log INFO "✅ Trove installation complete!"
 echo ""
 echo "Get started:"
-echo "  source /opt/trove/lib/trove_logging.zsh     # In shell scripts"
-echo "  klog INFO \"test message\"                    # From CLI/binaries"
-echo "  klog --help                                  # Show help"
+echo "  source ${INSTALL_DIR}/lib/trove_logging.zsh     # In shell scripts"
+echo "  klog INFO \"test message\"                       # From CLI/binaries"
+echo "  klog --help                                      # Show help"
 echo ""
 echo "Documentation:"
-echo "  /opt/trove/README.md                         # Overview"
-echo "  /opt/trove/docs/API.md                       # API reference"
+echo "  ${INSTALL_DIR}/README.md                         # Overview"
+echo "  ${INSTALL_DIR}/docs/API.md                       # API reference"
 echo ""
 echo "Version: $(cat ${INSTALL_DIR}/VERSION)"
 echo ""
