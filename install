@@ -76,6 +76,14 @@ for file in "${required_files[@]}"; do
 done
 trove_ok "Required files present"
 
+# Check for trove_init.zsh (should exist)
+trove_running "Checking initialization file"
+if [[ ! -f "${INSTALL_DIR}/lib/trove_init.zsh" ]]; then
+    trove_log ERROR "Missing file: lib/trove_init.zsh"
+    exit 1
+fi
+trove_ok "Initialization file present"
+
 ###############################################################################
 # Permissions
 ###############################################################################
@@ -138,9 +146,10 @@ if [[ ":$PATH:" == *":${INSTALL_DIR}/bin:"* ]]; then
     trove_ok "Trove is already in your PATH"
 else
     echo ""
-    trove_log INFO "To add Trove to your PATH, add this to your ~/.zshrc:"
+    trove_log INFO "To enable Trove functions, add this to your ~/.zshrc:"
     echo ""
-    echo "  export PATH=\"${INSTALL_DIR}/bin:\$PATH\""
+    echo "  # Trove - Shared Utilities Library"
+    echo "  source \"${INSTALL_DIR}/lib/trove_init.zsh\""
     echo ""
 
     # Offer to add to .zshrc
@@ -151,8 +160,12 @@ else
         if [[ "$response" =~ ^[Yy]$ ]]; then
             echo "" >> "${HOME}/.zshrc"
             echo "# Trove - Shared Utilities Library" >> "${HOME}/.zshrc"
-            echo "export PATH=\"${INSTALL_DIR}/bin:\$PATH\"" >> "${HOME}/.zshrc"
-            trove_ok "Added to ~/.zshrc - restart your shell or run: source ~/.zshrc"
+            echo "source \"${INSTALL_DIR}/lib/trove_init.zsh\"" >> "${HOME}/.zshrc"
+            trove_ok "Added to ~/.zshrc"
+
+            # Make available immediately in current shell
+            source "${INSTALL_DIR}/lib/trove_init.zsh"
+            trove_ok "Functions available in current shell"
         fi
     fi
 fi
@@ -164,14 +177,26 @@ fi
 echo ""
 trove_log INFO "✅ Trove installation complete!"
 echo ""
-echo "Get started:"
-echo "  source /opt/trove/lib/trove_logging.zsh     # In shell scripts"
-echo "  klog INFO \"test message\"                    # From CLI/binaries"
-echo "  klog --help                                  # Show help"
+echo "Functions are immediately available (no shell restart needed):"
+echo ""
+echo "Core functions (auto-loaded):"
+echo "  trove_log INFO \"test\"               # Logging"
+echo "  trove_bot \"Major Task\"              # Task headers"
+echo "  trove_running \"Configuring...\"      # Status messages"
+echo "  trove_ok \"Success\"                  # Success confirmations"
+echo ""
+echo "Optional libraries (load on-demand):"
+echo "  trove_load helpers                   # Path/system utilities"
+echo "  trove_load date                      # Date/time functions"
+echo "  trove_load monitoring                # System metrics"
+echo ""
+echo "CLI available:"
+echo "  klog INFO \"message\"                 # From compiled apps"
+echo "  klog --help                          # Show help"
 echo ""
 echo "Documentation:"
-echo "  /opt/trove/README.md                         # Overview"
-echo "  /opt/trove/docs/API.md                       # API reference"
+echo "  ${INSTALL_DIR}/README.md             # Overview"
+echo "  ${INSTALL_DIR}/docs/API.md           # API reference"
 echo ""
 echo "Version: $(cat ${INSTALL_DIR}/VERSION)"
 echo ""
