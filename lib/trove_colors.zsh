@@ -154,19 +154,20 @@ _trove_load_colorscheme() {
     # Use parameter expansion for zsh compatibility
     case "$scheme_name" in
         TROVE_COLORS_MONOKAI)
-            COL_RESET="${TROVE_COLORS_MONOKAI[RESET]}"
-            COL_RED="${TROVE_COLORS_MONOKAI[RED]}"
-            COL_GREEN="${TROVE_COLORS_MONOKAI[GREEN]}"
-            COL_YELLOW="${TROVE_COLORS_MONOKAI[YELLOW]}"
-            COL_ORANGE="${TROVE_COLORS_MONOKAI[ORANGE]}"
-            COL_PURPLE="${TROVE_COLORS_MONOKAI[PURPLE]}"
-            COL_BOLD_PURPLE="${TROVE_COLORS_MONOKAI[BOLD_PURPLE]}"
-            COL_BLUE="${TROVE_COLORS_MONOKAI[BLUE]}"
-            COL_CYAN="${TROVE_COLORS_MONOKAI[CYAN]}"
-            COL_WHITE="${TROVE_COLORS_MONOKAI[WHITE]}"
-            COL_BLACK="${TROVE_COLORS_MONOKAI[BLACK]}"
-            COL_DARK_GREEN="${TROVE_COLORS_MONOKAI[DARK_GREEN]}"
-            COL_GRAY="${TROVE_COLORS_MONOKAI[GRAY]}"
+            typeset -g COL_RESET="${TROVE_COLORS_MONOKAI[RESET]}"
+            typeset -g COL_BOLD="\033[1m"
+            typeset -g COL_RED="${TROVE_COLORS_MONOKAI[RED]}"
+            typeset -g COL_GREEN="${TROVE_COLORS_MONOKAI[GREEN]}"
+            typeset -g COL_YELLOW="${TROVE_COLORS_MONOKAI[YELLOW]}"
+            typeset -g COL_ORANGE="${TROVE_COLORS_MONOKAI[ORANGE]}"
+            typeset -g COL_PURPLE="${TROVE_COLORS_MONOKAI[PURPLE]}"
+            typeset -g COL_BOLD_PURPLE="${TROVE_COLORS_MONOKAI[BOLD_PURPLE]}"
+            typeset -g COL_BLUE="${TROVE_COLORS_MONOKAI[BLUE]}"
+            typeset -g COL_CYAN="${TROVE_COLORS_MONOKAI[CYAN]}"
+            typeset -g COL_WHITE="${TROVE_COLORS_MONOKAI[WHITE]}"
+            typeset -g COL_BLACK="${TROVE_COLORS_MONOKAI[BLACK]}"
+            typeset -g COL_DARK_GREEN="${TROVE_COLORS_MONOKAI[DARK_GREEN]}"
+            typeset -g COL_GRAY="${TROVE_COLORS_MONOKAI[GRAY]}"
             ;;
         TROVE_COLORS_SOLARIZED)
             COL_RESET="${TROVE_COLORS_SOLARIZED[RESET]}"
