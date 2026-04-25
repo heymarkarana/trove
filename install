@@ -1,10 +1,10 @@
-#!/usr/bin/env zsh
+#!/bin/bash
 # Trove Installer
 # Sets up Trove utilities for system-wide use
 
 set -e
 
-TROVE_ROOT="${0:A:h}"
+TROVE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo ""
 echo "╔════════════════════════════════════════════════════════════╗"
@@ -30,20 +30,99 @@ else
 fi
 
 ###############################################################################
+# Prerequisites
+###############################################################################
+
+trove_bot "Checking Prerequisites"
+
+PLATFORM="$(uname -s)"
+
+# --- Xcode Command Line Tools (macOS only) ---
+if [[ "$PLATFORM" == "Darwin" ]]; then
+    trove_running "Checking for Xcode Command Line Tools"
+    if ! xcode-select -p &>/dev/null; then
+        trove_log INFO "Xcode Command Line Tools not found — installing"
+        xcode-select --install
+        trove_log INFO "Waiting for installation to complete..."
+        until xcode-select -p &>/dev/null; do
+            sleep 5
+        done
+        trove_ok "Xcode Command Line Tools installed"
+    else
+        trove_ok "Xcode Command Line Tools: $(xcode-select -p)"
+    fi
+fi
+
+# --- Homebrew ---
+trove_running "Checking for Homebrew"
+if ! command -v brew >/dev/null 2>&1; then
+    trove_log INFO "Homebrew not found — installing now"
+
+    if [[ "$PLATFORM" == "Darwin" ]]; then
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # Bring brew into the current session (Apple Silicon or Intel)
+        if [[ -f "/opt/homebrew/bin/brew" ]]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [[ -f "/usr/local/bin/brew" ]]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+
+    elif [[ "$PLATFORM" == "Linux" ]]; then
+        trove_running "Installing Homebrew build dependencies"
+        sudo apt-get update -q && sudo apt-get install -y build-essential procps curl file git
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        if [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        fi
+
+    else
+        trove_log WARN "Unsupported platform '${PLATFORM}' — skipping Homebrew install"
+    fi
+
+    if command -v brew >/dev/null 2>&1; then
+        trove_ok "Homebrew installed: $(brew --version | head -1)"
+        # Persist shellenv to ~/.zshrc so brew is available in future sessions
+        if [[ -f "${HOME}/.zshrc" ]] && ! grep -q "brew shellenv" "${HOME}/.zshrc"; then
+            echo "" >> "${HOME}/.zshrc"
+            echo "# Homebrew" >> "${HOME}/.zshrc"
+            echo 'eval "$(brew shellenv)"' >> "${HOME}/.zshrc"
+            trove_ok "Added brew shellenv to ~/.zshrc"
+        fi
+    else
+        trove_log WARN "Homebrew install may have failed — some features may not be available"
+    fi
+else
+    trove_ok "Homebrew found: $(brew --version | head -1)"
+fi
+
+###############################################################################
 # Validation
 ###############################################################################
 
 trove_bot "Validating Installation"
 
-# Check if zsh is available
+# Ensure ZSH is installed
+trove_running "Checking for ZSH"
 if ! command -v zsh >/dev/null 2>&1; then
-    trove_log ERROR "zsh is required but not installed"
-    echo "Please install zsh first:"
-    echo "  macOS:  brew install zsh"
-    echo "  Ubuntu: sudo apt-get install zsh"
-    exit 1
+    trove_log INFO "ZSH not found — installing"
+    if [[ "$PLATFORM" == "Darwin" ]]; then
+        brew install zsh
+    elif [[ "$PLATFORM" == "Linux" ]]; then
+        sudo apt-get install -y zsh
+    fi
 fi
-trove_ok "zsh found: $(which zsh)"
+touch "${HOME}/.zshrc"
+trove_ok "ZSH ready: $(command -v zsh)"
+
+# Offer to switch default shell to ZSH
+if [[ "$(basename "$SHELL")" != "zsh" ]] && [[ -t 0 ]]; then
+    printf "  Switch default shell to ZSH? [Y/n]: "
+    read -r _zsh_switch
+    if [[ ! "$_zsh_switch" =~ ^[Nn]$ ]]; then
+        chsh -s "$(command -v zsh)"
+        trove_ok "Default shell set to ZSH (restart terminal to take effect)"
+    fi
+fi
 
 # Check directory structure
 trove_running "Checking directory structure"
@@ -75,6 +154,126 @@ for file in "${required_files[@]}"; do
     fi
 done
 trove_ok "Required files present"
+
+###############################################################################
+# SSH Key Setup
+###############################################################################
+
+trove_bot "SSH Key Setup"
+
+mkdir -p "${HOME}/.ssh"
+chmod 700 "${HOME}/.ssh"
+
+if [[ ! -f "${HOME}/.ssh/id_ed25519" ]]; then
+    trove_running "Generating SSH key (ed25519)"
+    ssh-keygen -t ed25519 -a 100 -f "${HOME}/.ssh/id_ed25519" -q -N ""
+    trove_ok "SSH key generated at ~/.ssh/id_ed25519"
+else
+    trove_ok "SSH key already exists at ~/.ssh/id_ed25519"
+fi
+
+echo ""
+trove_log INFO "Your public SSH key:"
+echo "────────────────────────────────────────────────────────────"
+cat "${HOME}/.ssh/id_ed25519.pub"
+echo "────────────────────────────────────────────────────────────"
+echo ""
+
+# Copy to clipboard
+if [[ "$PLATFORM" == "Darwin" ]]; then
+    pbcopy < "${HOME}/.ssh/id_ed25519.pub"
+    trove_ok "Key copied to clipboard"
+elif command -v xclip &>/dev/null; then
+    xclip -selection clipboard < "${HOME}/.ssh/id_ed25519.pub"
+    trove_ok "Key copied to clipboard"
+else
+    trove_log INFO "Install xclip for clipboard support: sudo apt install xclip"
+fi
+
+# Offer to open git service to add the key
+if [[ -t 0 ]]; then
+    echo ""
+    echo "  Add this key to your Git service:"
+    echo "    1) GitHub  — https://github.com/settings/keys"
+    echo "    2) GitLab  — https://gitlab.com/profile/keys"
+    echo "    3) Other   — enter URL manually"
+    echo "    4) Skip"
+    echo ""
+    printf "  Choice (1/2/3/4): "
+    read -r _ssh_choice
+
+    _ssh_url=""
+    case "$_ssh_choice" in
+        1) _ssh_url="https://github.com/settings/keys" ;;
+        2) _ssh_url="https://gitlab.com/profile/keys" ;;
+        3) printf "  URL: "; read -r _ssh_url ;;
+    esac
+
+    if [[ -n "$_ssh_url" ]]; then
+        if [[ "$PLATFORM" == "Darwin" ]]; then
+            open "$_ssh_url" 2>/dev/null || trove_log INFO "Visit: $_ssh_url"
+        else
+            xdg-open "$_ssh_url" 2>/dev/null || trove_log INFO "Visit: $_ssh_url"
+        fi
+        echo ""
+        printf "  Press Enter once you've added the key... "
+        read -r
+    fi
+fi
+
+###############################################################################
+# 1Password CLI
+###############################################################################
+
+trove_bot "1Password CLI"
+
+if command -v op &>/dev/null; then
+    trove_ok "1Password CLI already installed"
+else
+    echo ""
+    trove_log INFO "1Password CLI provides secure secret management:"
+    echo "    • API keys, SSH keys with biometric unlock, git-crypt keys"
+    echo ""
+    printf "  Install 1Password CLI? [Y/n]: "
+    read -r _op_install
+
+    if [[ ! "$_op_install" =~ ^[Nn]$ ]]; then
+        if [[ "$PLATFORM" == "Darwin" ]]; then
+            brew install --cask 1password-cli && trove_ok "1Password CLI installed"
+
+        elif [[ "$PLATFORM" == "Linux" ]]; then
+            trove_running "Adding 1Password APT repository"
+            curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+                sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+                sudo tee /etc/apt/sources.list.d/1password.list > /dev/null
+
+            sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/
+            curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | \
+                sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol > /dev/null
+            sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22
+            curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+                sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
+
+            sudo apt-get update -q && sudo apt-get install -y 1password-cli
+            trove_ok "1Password CLI installed"
+        fi
+    else
+        trove_log INFO "Skipping 1Password CLI — secrets will require manual entry"
+    fi
+fi
+
+# Authenticate if installed and not already signed in
+if command -v op &>/dev/null && ! op account list &>/dev/null 2>&1; then
+    echo ""
+    printf "  Add a 1Password account now? [Y/n]: "
+    read -r _op_auth
+    if [[ ! "$_op_auth" =~ ^[Nn]$ ]]; then
+        op account add && trove_ok "1Password account added" || \
+            trove_log WARN "Authentication skipped — run 'op account add' later"
+    fi
+fi
 
 ###############################################################################
 # Permissions

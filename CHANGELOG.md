@@ -5,6 +5,21 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3-beta] - 2026-04-25
+
+### Added
+- Machine prerequisites setup in installer, replacing the bootstrap repo
+  - Xcode Command Line Tools check and install (macOS)
+  - Homebrew install for macOS (Apple Silicon + Intel) and Linux
+  - ZSH install via `brew` or `apt` if missing; offer to set as default shell
+  - SSH key generation (ed25519), clipboard copy, and interactive git service setup
+  - 1Password CLI install (macOS via Homebrew cask, Ubuntu via APT) with account auth
+
+### Changed
+- Installer shebang changed from `#!/usr/bin/env zsh` to `#!/bin/bash` so the
+  script runs on a fresh Ubuntu machine before ZSH is installed
+- ZSH check changed from a fatal error to an automatic install
+
 ## [0.1.2-beta] - 2026-04-25
 
 ### Added
