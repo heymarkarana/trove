@@ -5,6 +5,11 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4-beta] - 2026-05-30
+
+### Documentation
+- **AGENTS.md rewritten** — removed hardcoded `/opt/trove` paths (replaced with `$TROVE_PATH`), removed homelab-specific identity ("kuzcotopia ecosystem", "The Secret Lab"), updated version reference, removed emojis, added architecture rules section (no hardcoding, no homelab identity, graceful degradation), and restructured to match the dotFiles AGENTS.md style. Function reference tables and usage patterns retained.
+
 ## [0.1.3-beta] - 2026-04-25
 
 ### Added
