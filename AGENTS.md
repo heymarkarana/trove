@@ -21,8 +21,10 @@ Trove is a dependency of dotFiles and Beskar — it is installed first during bo
 | `lib/trove_helpers.zsh` | Path, permission, system, and CLI utilities |
 | `lib/trove_date.zsh` | Date/time formatting and arithmetic |
 | `lib/trove_monitoring.zsh` | CPU, memory, disk metrics |
+| `lib/trove_requirements.zsh` | Dependency checking and optional installation |
 | `lib/trove_init.zsh` | Library initialization |
 | `bin/klog` | CLI logging binary for non-shell callers |
+| `bin/kreq` | CLI requirements checker for non-shell callers |
 | `config/` | Default and local config |
 | `tests/` | Test suite — run with `bash tests/run_tests.sh` |
 | `examples/` | Usage examples |
@@ -101,6 +103,20 @@ source "${TROVE_PATH}/lib/trove_logging.zsh"
 | `trove_get_env "VAR" "default"` | Read env var with fallback |
 | `trove_is_root` | True if running as root |
 | `trove_is_macos` / `trove_is_ubuntu` | Platform detection |
+
+### Requirements (`trove_requirements.zsh`)
+
+Load with `trove_load requirements`.
+
+| Function | Purpose |
+|---|---|
+| `trove_require_status NAME [opts]` | Check dependency (check-only) |
+| `trove_ensure NAME [opts] --install` | Check and optionally install |
+| `trove_requirements_check MANIFEST` | Batch check from YAML/JSON |
+| `trove_requirements_ensure MANIFEST --install` | Batch install from manifest |
+| `trove_version_compare` / `trove_version_satisfies` | Version constraint helpers |
+
+Providers: `brew`, `apt`, `snap`, `npm`, `custom`. See `examples/requirements.yaml`.
 
 ### Date/time (`trove_date.zsh`)
 

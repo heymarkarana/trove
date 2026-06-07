@@ -5,6 +5,14 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5-beta] - 2026-06-06
+
+### Added
+- **`trove_requirements.zsh`** — optional module for dependency checking and opt-in installation via brew, apt, snap, npm, or custom providers
+- **`kreq` CLI** — command-line dependency checker for non-shell callers (mirrors `klog`)
+- YAML/JSON manifest support with `trove_requirements_check` / `trove_requirements_ensure`
+- 23 new tests in `tests/test_requirements.zunit`
+
 ## [0.1.4-beta] - 2026-05-30
 
 ### Documentation

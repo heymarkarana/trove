@@ -1,0 +1,175 @@
+#!/usr/bin/env zunit
+
+@setup {
+  local dir="${0:A:h}"
+  while [[ "$dir" != "/" && ! -f "${dir}/lib/trove_helpers.zsh" ]]; do
+    dir="${dir:h}"
+  done
+  TROVE_ROOT="$dir"
+  source "${TROVE_ROOT}/lib/trove_helpers.zsh"
+  source "${TROVE_ROOT}/lib/trove_requirements.zsh"
+}
+
+# Version parsing
+
+@test 'trove_version_parse extracts semver from git output' {
+  run trove_version_parse "git version 2.39.2"
+
+  assert $state equals 0
+  assert "$output" same_as "2.39.2"
+}
+
+@test 'trove_version_parse extracts semver from node output' {
+  run trove_version_parse "v18.17.0"
+
+  assert $state equals 0
+  assert "$output" same_as "18.17.0"
+}
+
+@test 'trove_version_parse fails on text without version' {
+  run trove_version_parse "no version here"
+
+  assert $state equals 1
+}
+
+# Version comparison
+
+@test 'trove_version_compare >= passes when equal' {
+  run trove_version_compare "2.30.0" ">=" "2.30.0"
+
+  assert $state equals 0
+}
+
+@test 'trove_version_compare >= passes when greater' {
+  run trove_version_compare "2.39.2" ">=" "2.30.0"
+
+  assert $state equals 0
+}
+
+@test 'trove_version_compare >= fails when lower' {
+  run trove_version_compare "2.29.0" ">=" "2.30.0"
+
+  assert $state equals 1
+}
+
+@test 'trove_version_compare > fails when equal' {
+  run trove_version_compare "2.30.0" ">" "2.30.0"
+
+  assert $state equals 1
+}
+
+@test 'trove_version_satisfies parses constraint prefix' {
+  run trove_version_satisfies "3.0.0" ">=2.30.0"
+
+  assert $state equals 0
+}
+
+# Command version
+
+@test 'trove_get_command_version returns version for zsh' {
+  run trove_get_command_version "zsh" "--version"
+
+  assert $state equals 0
+  assert "$output" is_not_empty
+}
+
+@test 'trove_get_command_version fails for missing command' {
+  run trove_get_command_version "nonexistent_command_12345" "--version"
+
+  assert $state equals 1
+}
+
+# Provider hints
+
+@test '_trove_pkg_install_cmd returns brew install hint' {
+  run _trove_pkg_install_cmd "brew" "git"
+
+  assert $state equals 0
+  assert "$output" same_as "brew install git"
+}
+
+@test '_trove_pkg_install_cmd returns apt install hint' {
+  run _trove_pkg_install_cmd "apt" "git"
+
+  assert $state equals 0
+  assert "$output" contains "apt-get install"
+}
+
+@test '_trove_pkg_install_cmd returns npm install hint' {
+  run _trove_pkg_install_cmd "npm" "prettier"
+
+  assert $state equals 0
+  assert "$output" same_as "npm install -g prettier"
+}
+
+# Requirement status
+
+@test 'trove_require_status passes for existing zsh' {
+  run trove_require_status "zsh"
+
+  assert $state equals 0
+}
+
+@test 'trove_require_status fails for missing command' {
+  run trove_require_status "nonexistent_command_12345"
+
+  assert $state equals 1
+}
+
+@test 'trove_require_status emits JSON when TROVE_REQUIRE_JSON=1' {
+  TROVE_REQUIRE_JSON=1
+  run trove_require_status "zsh"
+
+  assert $state equals 0
+  assert "$output" contains '"status":"ok"'
+  assert "$output" contains '"name":"zsh"'
+}
+
+@test 'trove_require_status fails outdated version constraint' {
+  run trove_require_status "zsh" --version ">=99.99.99"
+
+  assert $state equals 2
+}
+
+# Manifest
+
+@test 'trove_requirements_check loads JSON manifest' {
+  run trove_requirements_check "${TROVE_ROOT}/examples/requirements.json"
+
+  assert $state equals 0
+}
+
+@test 'trove_requirements_check fails for missing manifest' {
+  run trove_requirements_check "/tmp/nonexistent_manifest_12345.json"
+
+  assert $state equals 3
+}
+
+@test 'trove_requirements_load_manifest parses minimal YAML' {
+  local manifest="${TROVE_ROOT}/examples/requirements.yaml"
+  run _trove_requirements_load_manifest "$manifest"
+
+  assert $state equals 0
+  assert "$output" contains '"requirements"'
+}
+
+# kreq CLI
+
+@test 'kreq is executable' {
+  run test -x "${TROVE_ROOT}/bin/kreq"
+
+  assert $state equals 0
+}
+
+@test 'kreq check zsh succeeds' {
+  run "${TROVE_ROOT}/bin/kreq" check zsh
+
+  assert $state equals 0
+}
+
+@test 'kreq check --json emits JSON' {
+  run "${TROVE_ROOT}/bin/kreq" check zsh --json
+
+  assert $state equals 0
+  assert "$output" contains '"status":"ok"'
+}

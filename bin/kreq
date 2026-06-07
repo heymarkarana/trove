@@ -1,0 +1,187 @@
+#!/usr/bin/env zsh
+# kreq - Trove requirements CLI for dependency checking from any language
+
+TROVE_HOME="${0:A:h:h}"
+
+if [[ -f "${TROVE_HOME}/lib/trove_logging.zsh" ]]; then
+    source "${TROVE_HOME}/lib/trove_logging.zsh"
+fi
+
+if [[ -f "${TROVE_HOME}/lib/trove_helpers.zsh" ]]; then
+    source "${TROVE_HOME}/lib/trove_helpers.zsh"
+fi
+
+if [[ -f "${TROVE_HOME}/lib/trove_requirements.zsh" ]]; then
+    source "${TROVE_HOME}/lib/trove_requirements.zsh"
+else
+    echo "ERROR: Could not find trove_requirements.zsh" >&2
+    exit 3
+fi
+
+show_help() {
+    cat <<EOF
+kreq - Trove Requirements CLI
+
+Usage:
+  kreq check NAME [options]       Check a single requirement (check-only)
+  kreq ensure NAME [options]      Ensure requirement (--install to install)
+  kreq check-file MANIFEST        Check all requirements in a manifest
+  kreq ensure-file MANIFEST       Ensure all requirements (--install required)
+  kreq --help                     Show this help
+
+Options (check / ensure):
+  --command CMD         Binary to check (default: NAME)
+  --version CONSTRAINT  Version constraint (e.g. ">=2.30.0")
+  --providers LIST      Comma-separated providers (e.g. brew,apt)
+  --json                Emit JSON status on stdout
+
+Options (ensure only):
+  --install             Install missing dependencies when a provider is available
+
+Manifest formats:
+  .yaml / .yml          YAML (PyYAML recommended; minimal parser fallback)
+  .json                 JSON (requires python3)
+
+Exit codes:
+  0  All requirements satisfied
+  1  Missing dependency
+  2  Outdated dependency
+  3  Error (invalid usage or manifest)
+
+Environment:
+  TROVE_ALLOW_SUDO=1    Allow sudo install commands for apt/snap
+  TROVE_REQUIRE_JSON=1  Same as --json
+
+Examples:
+  kreq check git --version ">=2.30.0" --json
+  kreq ensure node --providers brew,apt --install
+  kreq check-file ./requirements.yaml --json
+  kreq ensure-file ./requirements.yaml --install
+EOF
+}
+
+parse_common_flags() {
+    local -a remaining=()
+    export TROVE_REQUIRE_JSON=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json) TROVE_REQUIRE_JSON=1; shift ;;
+            *) remaining+=("$1"); shift ;;
+        esac
+    done
+
+    reply=("${remaining[@]}")
+}
+
+cmd_check() {
+    local -a args
+    parse_common_flags "$@"
+    args=("${reply[@]}")
+
+    [[ ${#args[@]} -ge 1 ]] || {
+        echo "ERROR: check requires a requirement name" >&2
+        exit 3
+    }
+
+    local name="${args[1]}"
+    trove_require_status "$name" "${args[@]:2}"
+    exit $?
+}
+
+cmd_ensure() {
+    local -a args
+    local do_install=false
+    parse_common_flags "$@"
+    args=("${reply[@]}")
+
+    local -a passthrough=()
+    while [[ ${#args[@]} -gt 0 ]]; do
+        case "${args[1]}" in
+            --install) do_install=true; args=("${args[@]:2}") ;;
+            *) passthrough+=("${args[1]}"); args=("${args[@]:2}") ;;
+        esac
+    done
+
+    [[ ${#passthrough[@]} -ge 1 ]] || {
+        echo "ERROR: ensure requires a requirement name" >&2
+        exit 3
+    }
+
+    local name="${passthrough[1]}"
+    local -a rest=("${passthrough[@]:2}")
+
+    if [[ "$do_install" == true ]]; then
+        trove_ensure "$name" "${rest[@]}" --install
+    else
+        trove_require_status "$name" "${rest[@]}"
+    fi
+    exit $?
+}
+
+cmd_check_file() {
+    local -a args manifest
+    parse_common_flags "$@"
+    args=("${reply[@]}")
+
+    [[ ${#args[@]} -ge 1 ]] || {
+        echo "ERROR: check-file requires a manifest path" >&2
+        exit 3
+    }
+
+    manifest="${args[1]}"
+    trove_requirements_check "$manifest"
+    exit $?
+}
+
+cmd_ensure_file() {
+    local -a args manifest
+    local do_install=false
+    parse_common_flags "$@"
+    args=("${reply[@]}")
+
+    while [[ ${#args[@]} -gt 0 ]]; do
+        case "${args[1]}" in
+            --install) do_install=true; args=("${args[@]:2}") ;;
+            *) break ;;
+        esac
+    done
+
+    [[ ${#args[@]} -ge 1 ]] || {
+        echo "ERROR: ensure-file requires a manifest path" >&2
+        exit 3
+    }
+
+    [[ "$do_install" == true ]] || {
+        echo "ERROR: ensure-file requires --install" >&2
+        exit 3
+    }
+
+    manifest="${args[1]}"
+    trove_requirements_ensure "$manifest" --install
+    exit $?
+}
+
+main() {
+    if [[ $# -eq 0 || "$1" == "--help" || "$1" == "-h" ]]; then
+        show_help
+        exit 0
+    fi
+
+    local command="$1"
+    shift
+
+    case "$command" in
+        check)       cmd_check "$@" ;;
+        ensure)      cmd_ensure "$@" ;;
+        check-file)  cmd_check_file "$@" ;;
+        ensure-file) cmd_ensure_file "$@" ;;
+        *)
+            echo "ERROR: Unknown command: $command" >&2
+            echo "Use 'kreq --help' for usage" >&2
+            exit 3
+            ;;
+    esac
+}
+
+main "$@"

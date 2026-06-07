@@ -1,0 +1,21 @@
+{
+  "requirements": [
+    {
+      "name": "git",
+      "command": "git",
+      "version": ">=2.30.0",
+      "providers": [
+        {"brew": "git"},
+        {"apt": "git"}
+      ]
+    },
+    {
+      "name": "zsh",
+      "command": "zsh",
+      "providers": [
+        {"brew": "zsh"},
+        {"apt": "zsh"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Example Trove requirements manifest
+# Check: trove_requirements_check ./examples/requirements.yaml
+# Install (opt-in): trove_requirements_ensure ./examples/requirements.yaml --install
+
+requirements:
+  - name: git
+    command: git
+    version: ">=2.30.0"
+    version_probe: "--version"
+    providers:
+      - brew: git
+      - apt: git
+
+  - name: zsh
+    command: zsh
+    providers:
+      - brew: zsh
+      - apt: zsh
+
+  - name: prettier
+    command: prettier
+    providers:
+      - npm: prettier

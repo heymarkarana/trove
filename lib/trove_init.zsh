@@ -41,10 +41,11 @@ trove_load() {
         echo "Usage: trove_load <library>" >&2
         echo "" >&2
         echo "Available libraries:" >&2
-        echo "  helpers    - Path validation, permissions, platform detection" >&2
-        echo "  monitoring - System metrics for monitoring integrations" >&2
-        echo "  date       - Timestamp formatting, date arithmetic" >&2
-        echo "  all        - Load all optional libraries" >&2
+        echo "  helpers      - Path validation, permissions, platform detection" >&2
+        echo "  requirements - Dependency checking and optional installation" >&2
+        echo "  monitoring   - System metrics for monitoring integrations" >&2
+        echo "  date         - Timestamp formatting, date arithmetic" >&2
+        echo "  all          - Load all optional libraries" >&2
         return 1
     fi
 
@@ -54,6 +55,22 @@ trove_load() {
                 source "${TROVE_HOME}/lib/trove_helpers.zsh"
             else
                 echo "Error: trove_helpers.zsh not found" >&2
+                return 1
+            fi
+            ;;
+        requirements|require|req)
+            if ! (( ${+functions[trove_command_exists]} )); then
+                if [[ -f "${TROVE_HOME}/lib/trove_helpers.zsh" ]]; then
+                    source "${TROVE_HOME}/lib/trove_helpers.zsh"
+                else
+                    echo "Error: trove_helpers.zsh not found (required by requirements)" >&2
+                    return 1
+                fi
+            fi
+            if [[ -f "${TROVE_HOME}/lib/trove_requirements.zsh" ]]; then
+                source "${TROVE_HOME}/lib/trove_requirements.zsh"
+            else
+                echo "Error: trove_requirements.zsh not found" >&2
                 return 1
             fi
             ;;
@@ -75,12 +92,13 @@ trove_load() {
             ;;
         all)
             trove_load helpers
+            trove_load requirements
             trove_load monitoring
             trove_load date
             ;;
         *)
             echo "Unknown library: $1" >&2
-            echo "Available: helpers, monitoring, date, all" >&2
+            echo "Available: helpers, requirements, monitoring, date, all" >&2
             return 1
             ;;
     esac

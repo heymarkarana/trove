@@ -13,6 +13,7 @@ Complete API documentation for Trove v0.1.0-beta
 - [Helper Utilities](#helper-utilities)
 - [Monitoring Functions](#monitoring-functions)
 - [Date & Time Utilities](#date--time-utilities)
+- [Requirements](#requirements)
 - [Configuration](#configuration)
 
 ---
@@ -719,6 +720,100 @@ Get date for log files (YYYY-MM-DD).
 
 ---
 
+## Requirements
+
+Load with `trove_load requirements` (sources helpers automatically).
+
+Check-only by default. Install only when `--install` is passed or `trove_requirements_ensure` is used.
+
+### Version Utilities
+
+#### `trove_version_parse "text"`
+
+Extract the first semver-like version from arbitrary text.
+
+#### `trove_version_compare "v1" "op" "v2"`
+
+Compare versions. Operators: `>=`, `>`, `<=`, `<`, `==`, `eq`.
+
+#### `trove_version_satisfies "installed" "constraint"`
+
+Check if installed version satisfies a constraint like `>=2.30.0`.
+
+#### `trove_get_command_version "command" "probe"`
+
+Get version from a command (default probe: `--version`).
+
+### Single Requirement
+
+#### `trove_require_status NAME [options]`
+
+Check one requirement. Returns exit code: `0` ok, `1` missing, `2` outdated, `3` error.
+
+**Options**:
+- `--command CMD` — binary to check (default: NAME)
+- `--version CONSTRAINT` — version constraint (e.g. `>=2.30.0`)
+- `--providers LIST` — comma-separated providers (e.g. `brew,apt`)
+- `--version-probe PROBE` — version command args (default: `--version`)
+- `--check SCRIPT` — custom check shell snippet
+- `--install-cmd SCRIPT` — custom install command
+
+**Example**:
+```bash
+trove_require_status git --version ">=2.30.0" --providers brew,apt
+TROVE_REQUIRE_JSON=1 trove_require_status git --version ">=2.30.0"
+```
+
+#### `trove_ensure NAME [options] [--install]`
+
+Check and optionally install a requirement.
+
+```bash
+trove_ensure git --providers brew,apt --install
+```
+
+### Manifest (Batch)
+
+#### `trove_requirements_check MANIFEST`
+
+Check all entries in a YAML or JSON manifest.
+
+#### `trove_requirements_ensure MANIFEST --install`
+
+Install missing dependencies from a manifest (requires `--install`).
+
+**Manifest example** (`examples/requirements.yaml`):
+```yaml
+requirements:
+  - name: git
+    command: git
+    version: ">=2.30.0"
+    providers:
+      - brew: git
+      - apt: git
+```
+
+### Providers
+
+| Provider | Install hint |
+|----------|--------------|
+| `brew` | `brew install PACKAGE` |
+| `apt` | `sudo apt-get install -y PACKAGE` |
+| `snap` | `sudo snap install PACKAGE` |
+| `npm` | `npm install -g PACKAGE` |
+| `custom` | User-supplied `install` script in manifest |
+
+Set `TROVE_ALLOW_SUDO=1` to allow apt/snap install commands to run. Without it, install hints are reported only.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TROVE_REQUIRE_JSON` | 0 | Emit JSON status on stdout |
+| `TROVE_ALLOW_SUDO` | 0 | Allow sudo install commands |
+
+---
+
 ## Configuration
 
 ### Environment Variables
@@ -775,6 +870,38 @@ klog ok "Installation complete"
 ```bash
 klog --help
 ```
+
+---
+
+## CLI Usage (kreq)
+
+The `kreq` binary checks dependencies from shell scripts, CI, or other languages.
+
+### Syntax
+
+```bash
+kreq check NAME [options]
+kreq ensure NAME [options] --install
+kreq check-file MANIFEST [--json]
+kreq ensure-file MANIFEST --install
+```
+
+### Examples
+
+```bash
+kreq check git --version ">=2.30.0" --json
+kreq ensure node --providers brew,apt --install
+kreq check-file ./requirements.yaml --json
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Satisfied |
+| 1 | Missing |
+| 2 | Outdated |
+| 3 | Error |
 
 ---
 
