@@ -147,92 +147,25 @@ trove_set_colorscheme() {
     return 0
 }
 
-# Internal: Load color scheme into COL_* variables
+# Internal: Load a color scheme into the global COL_* variables.
+#
+# Every COL_* is declared `typeset -g` so the colors remain visible no matter
+# what scope trove_set_colorscheme is called from (a nested function with a
+# `local COL_*` in an enclosing frame previously shadowed four of the five
+# schemes — only Monokai used `typeset -g`). The keys are copied generically via
+# indirect expansion so all schemes are guaranteed identical coverage.
 _trove_load_colorscheme() {
-    local scheme_name=$1
+    local scheme_name="$1"
+    local key
 
-    # Use parameter expansion for zsh compatibility
-    case "$scheme_name" in
-        TROVE_COLORS_MONOKAI)
-            typeset -g COL_RESET="${TROVE_COLORS_MONOKAI[RESET]}"
-            typeset -g COL_BOLD="\033[1m"
-            typeset -g COL_RED="${TROVE_COLORS_MONOKAI[RED]}"
-            typeset -g COL_GREEN="${TROVE_COLORS_MONOKAI[GREEN]}"
-            typeset -g COL_YELLOW="${TROVE_COLORS_MONOKAI[YELLOW]}"
-            typeset -g COL_ORANGE="${TROVE_COLORS_MONOKAI[ORANGE]}"
-            typeset -g COL_PURPLE="${TROVE_COLORS_MONOKAI[PURPLE]}"
-            typeset -g COL_BOLD_PURPLE="${TROVE_COLORS_MONOKAI[BOLD_PURPLE]}"
-            typeset -g COL_BLUE="${TROVE_COLORS_MONOKAI[BLUE]}"
-            typeset -g COL_CYAN="${TROVE_COLORS_MONOKAI[CYAN]}"
-            typeset -g COL_WHITE="${TROVE_COLORS_MONOKAI[WHITE]}"
-            typeset -g COL_BLACK="${TROVE_COLORS_MONOKAI[BLACK]}"
-            typeset -g COL_DARK_GREEN="${TROVE_COLORS_MONOKAI[DARK_GREEN]}"
-            typeset -g COL_GRAY="${TROVE_COLORS_MONOKAI[GRAY]}"
-            ;;
-        TROVE_COLORS_SOLARIZED)
-            COL_RESET="${TROVE_COLORS_SOLARIZED[RESET]}"
-            COL_RED="${TROVE_COLORS_SOLARIZED[RED]}"
-            COL_GREEN="${TROVE_COLORS_SOLARIZED[GREEN]}"
-            COL_YELLOW="${TROVE_COLORS_SOLARIZED[YELLOW]}"
-            COL_ORANGE="${TROVE_COLORS_SOLARIZED[ORANGE]}"
-            COL_PURPLE="${TROVE_COLORS_SOLARIZED[PURPLE]}"
-            COL_BOLD_PURPLE="${TROVE_COLORS_SOLARIZED[BOLD_PURPLE]}"
-            COL_BLUE="${TROVE_COLORS_SOLARIZED[BLUE]}"
-            COL_CYAN="${TROVE_COLORS_SOLARIZED[CYAN]}"
-            COL_WHITE="${TROVE_COLORS_SOLARIZED[WHITE]}"
-            COL_BLACK="${TROVE_COLORS_SOLARIZED[BLACK]}"
-            COL_DARK_GREEN="${TROVE_COLORS_SOLARIZED[DARK_GREEN]}"
-            COL_GRAY="${TROVE_COLORS_SOLARIZED[GRAY]}"
-            ;;
-        TROVE_COLORS_NORD)
-            COL_RESET="${TROVE_COLORS_NORD[RESET]}"
-            COL_RED="${TROVE_COLORS_NORD[RED]}"
-            COL_GREEN="${TROVE_COLORS_NORD[GREEN]}"
-            COL_YELLOW="${TROVE_COLORS_NORD[YELLOW]}"
-            COL_ORANGE="${TROVE_COLORS_NORD[ORANGE]}"
-            COL_PURPLE="${TROVE_COLORS_NORD[PURPLE]}"
-            COL_BOLD_PURPLE="${TROVE_COLORS_NORD[BOLD_PURPLE]}"
-            COL_BLUE="${TROVE_COLORS_NORD[BLUE]}"
-            COL_CYAN="${TROVE_COLORS_NORD[CYAN]}"
-            COL_WHITE="${TROVE_COLORS_NORD[WHITE]}"
-            COL_BLACK="${TROVE_COLORS_NORD[BLACK]}"
-            COL_DARK_GREEN="${TROVE_COLORS_NORD[DARK_GREEN]}"
-            COL_GRAY="${TROVE_COLORS_NORD[GRAY]}"
-            ;;
-        TROVE_COLORS_DRACULA)
-            COL_RESET="${TROVE_COLORS_DRACULA[RESET]}"
-            COL_RED="${TROVE_COLORS_DRACULA[RED]}"
-            COL_GREEN="${TROVE_COLORS_DRACULA[GREEN]}"
-            COL_YELLOW="${TROVE_COLORS_DRACULA[YELLOW]}"
-            COL_ORANGE="${TROVE_COLORS_DRACULA[ORANGE]}"
-            COL_PURPLE="${TROVE_COLORS_DRACULA[PURPLE]}"
-            COL_BOLD_PURPLE="${TROVE_COLORS_DRACULA[BOLD_PURPLE]}"
-            COL_BLUE="${TROVE_COLORS_DRACULA[BLUE]}"
-            COL_CYAN="${TROVE_COLORS_DRACULA[CYAN]}"
-            COL_WHITE="${TROVE_COLORS_DRACULA[WHITE]}"
-            COL_BLACK="${TROVE_COLORS_DRACULA[BLACK]}"
-            COL_DARK_GREEN="${TROVE_COLORS_DRACULA[DARK_GREEN]}"
-            COL_GRAY="${TROVE_COLORS_DRACULA[GRAY]}"
-            ;;
-        TROVE_COLORS_GRUVBOX)
-            COL_RESET="${TROVE_COLORS_GRUVBOX[RESET]}"
-            COL_RED="${TROVE_COLORS_GRUVBOX[RED]}"
-            COL_GREEN="${TROVE_COLORS_GRUVBOX[GREEN]}"
-            COL_YELLOW="${TROVE_COLORS_GRUVBOX[YELLOW]}"
-            COL_ORANGE="${TROVE_COLORS_GRUVBOX[ORANGE]}"
-            COL_PURPLE="${TROVE_COLORS_GRUVBOX[PURPLE]}"
-            COL_BOLD_PURPLE="${TROVE_COLORS_GRUVBOX[BOLD_PURPLE]}"
-            COL_BLUE="${TROVE_COLORS_GRUVBOX[BLUE]}"
-            COL_CYAN="${TROVE_COLORS_GRUVBOX[CYAN]}"
-            COL_WHITE="${TROVE_COLORS_GRUVBOX[WHITE]}"
-            COL_BLACK="${TROVE_COLORS_GRUVBOX[BLACK]}"
-            COL_DARK_GREEN="${TROVE_COLORS_GRUVBOX[DARK_GREEN]}"
-            COL_GRAY="${TROVE_COLORS_GRUVBOX[GRAY]}"
-            ;;
-    esac
+    for key in RESET RED GREEN YELLOW ORANGE PURPLE BOLD_PURPLE \
+               BLUE CYAN WHITE BLACK DARK_GREEN GRAY; do
+        typeset -g "COL_${key}=${(P)${:-${scheme_name}[$key]}}"
+    done
 
-    # Utility
-    COL_SPACE="        "
+    # Static extras present in every scheme.
+    typeset -g COL_BOLD="\033[1m"
+    typeset -g COL_SPACE="        "
 }
 
 # Show available color schemes with samples

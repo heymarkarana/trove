@@ -1,0 +1,158 @@
+#!/usr/bin/env zunit
+
+@setup {
+  # Fall back to the current dir when not launched via run_tests.sh.
+  : ${TROVE_HOME:=$PWD}
+
+  # Isolated registry per test run (never touch the real /opt/.atlas).
+  TROVE_TEST_DIR="/tmp/trove_atlas_test_$$"
+  mkdir -p "${TROVE_TEST_DIR}"
+  export ATLAS_REGISTRY="${TROVE_TEST_DIR}/registry"
+
+  source "${TROVE_HOME}/lib/trove_atlas.zsh"
+
+  # A known-good registry for the read tests.
+  trove_atlas_sync \
+    primary_user=alice \
+    group=devs \
+    install_root=/opt/myapp \
+    config_home=/opt/myapp/.config/dotFiles \
+    beskar=/custom/beskar >/dev/null
+}
+
+@teardown {
+  rm -rf "${TROVE_TEST_DIR}"
+  unset ATLAS_REGISTRY
+}
+
+# ---- resolution order: env -> registry -> default ----
+
+@test 'trove_atlas_get resolves a key from the registry' {
+  run trove_atlas_get primary_user
+  assert $state equals 0
+  assert "$output" same_as 'alice'
+}
+
+@test 'trove_atlas_get returns non-zero for an unknown key with no default' {
+  run trove_atlas_get does_not_exist
+  assert $state equals 1
+  assert "$output" is_empty
+}
+
+@test 'trove_atlas_get falls back to the caller default' {
+  run trove_atlas_get does_not_exist fallback_value
+  assert $state equals 0
+  assert "$output" same_as 'fallback_value'
+}
+
+@test 'trove_atlas_get prefers a neutral ATLAS_* env override over the registry' {
+  ATLAS_PRIMARY_USER=bob run trove_atlas_get primary_user
+  assert $state equals 0
+  assert "$output" same_as 'bob'
+}
+
+# ---- require: fail loud on instance facts ----
+
+@test 'trove_atlas_require returns the value when present' {
+  run trove_atlas_require install_root
+  assert $state equals 0
+  assert "$output" same_as '/opt/myapp'
+}
+
+@test 'trove_atlas_require fails loud when a key is unresolved' {
+  run trove_atlas_require missing_fact
+  assert $state equals 1
+  assert "$output" contains 'unresolved'
+}
+
+# ---- tool resolution ----
+
+@test 'trove_atlas_tool returns the registry value when set' {
+  run trove_atlas_tool beskar
+  assert $state equals 0
+  assert "$output" same_as '/custom/beskar'
+}
+
+@test 'trove_atlas_tool falls back to the fixed /opt default' {
+  run trove_atlas_tool dotfiles
+  assert $state equals 0
+  assert "$output" same_as '/opt/dotFiles'
+}
+
+@test 'trove_atlas_tool honors TROVE_HOME for the trove tool' {
+  TROVE_HOME=/somewhere/trove run trove_atlas_tool trove
+  assert $state equals 0
+  assert "$output" same_as '/somewhere/trove'
+}
+
+@test 'trove_atlas_tool rejects an unknown tool' {
+  run trove_atlas_tool nonsense
+  assert $state equals 1
+}
+
+# ---- mutation: set / unset / sync / dump ----
+
+@test 'trove_atlas_set adds a new key idempotently' {
+  trove_atlas_set newkey newval
+  trove_atlas_set newkey newval
+  run trove_atlas_get newkey
+  assert "$output" same_as 'newval'
+  # only one line for the key (idempotent, no duplication)
+  run zsh -c "grep -c '^newkey=' '${ATLAS_REGISTRY}'"
+  assert "$output" same_as '1'
+}
+
+@test 'trove_atlas_set updates an existing key in place' {
+  trove_atlas_set group newgroup
+  run trove_atlas_get group
+  assert "$output" same_as 'newgroup'
+}
+
+@test 'trove_atlas_unset removes a key' {
+  trove_atlas_unset primary_user
+  run trove_atlas_get primary_user
+  assert $state equals 1
+}
+
+@test 'trove_atlas_dump prints all key=value pairs' {
+  run trove_atlas_dump
+  assert "$output" contains 'primary_user=alice'
+  assert "$output" contains 'install_root=/opt/myapp'
+}
+
+@test 'trove_atlas_sync rebuilds the registry from provided facts' {
+  trove_atlas_sync primary_user=carol group=ops install_root=/srv/app
+  run trove_atlas_get primary_user
+  assert "$output" same_as 'carol'
+  # the old beskar key is gone after a full rebuild
+  run trove_atlas_get beskar
+  assert $state equals 1
+}
+
+@test 'trove_atlas_sync rejects an argument that is not key=value' {
+  run trove_atlas_sync notavalidpair
+  assert $state equals 1
+}
+
+# ---- registry hygiene ----
+
+@test 'the registry file is mode 644' {
+  run zsh -c "stat -f '%Lp' '${ATLAS_REGISTRY}' 2>/dev/null || stat -c '%a' '${ATLAS_REGISTRY}'"
+  assert "$output" same_as '644'
+}
+
+@test 'comments and blank lines are ignored when parsing' {
+  print -r -- "# a comment"      >> "${ATLAS_REGISTRY}"
+  print -r -- ""                 >> "${ATLAS_REGISTRY}"
+  print -r -- "extra=present"    >> "${ATLAS_REGISTRY}"
+  run trove_atlas_get extra
+  assert "$output" same_as 'present'
+}
+
+# ---- purity: no consumer-namespace leakage ----
+
+@test 'the atlas module contains no DF_* or BESKAR_* variable references' {
+  run zsh -c "grep -nE 'DF_[A-Z]|BESKAR_[A-Z]' '${TROVE_HOME}/lib/trove_atlas.zsh'"
+  assert $state equals 1
+  assert "$output" is_empty
+}

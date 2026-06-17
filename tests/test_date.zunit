@@ -2,7 +2,7 @@
 
 @setup {
   # Source the date library
-  source "/opt/trove/lib/trove_date.zsh"
+  source "${TROVE_HOME}/lib/trove_date.zsh"
   export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
 }
 

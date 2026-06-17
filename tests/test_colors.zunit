@@ -2,7 +2,7 @@
 
 @setup {
   # Source the colors library
-  source "/opt/trove/lib/trove_colors.zsh"
+  source "${TROVE_HOME}/lib/trove_colors.zsh"
 }
 
 @teardown {
@@ -117,4 +117,25 @@
 
   # Color scheme should still be nord
   assert "${TROVE_CURRENT_COLORSCHEME}" equals "nord"
+}
+
+###############################################################################
+# v1.0 fix: every scheme exports all COL_* globally (was Monokai-only)
+###############################################################################
+
+@test 'every colorscheme sets COL_* globally even from a nested function scope' {
+  # A caller with a `local COL_RED` previously shadowed four of five schemes.
+  _apply() { trove_set_colorscheme "$1"; }
+  local missing=""
+  for scheme in monokai solarized nord dracula gruvbox; do
+    _apply "$scheme"
+    [[ -n "$COL_RED" && -n "$COL_GREEN" && -n "$COL_BOLD" && -n "$COL_BOLD_PURPLE" && -n "$COL_RESET" ]] \
+      || missing="${missing} ${scheme}"
+  done
+  assert "$missing" is_empty
+}
+
+@test 'COL_BOLD is defined for a non-monokai scheme' {
+  trove_set_colorscheme "gruvbox"
+  assert "$COL_BOLD" is_not_empty
 }

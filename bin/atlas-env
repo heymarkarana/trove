@@ -1,0 +1,71 @@
+#!/usr/bin/env zsh
+# atlas-env - Emit Atlas discovery values as POSIX `export` lines.
+#
+# A scheduled job (cron/systemd) or any non-interactive context that has no
+# $HOME can learn absolute ecosystem paths by sourcing this output:
+#
+#     eval "$(/opt/trove/bin/atlas-env)"
+#
+# Emits NEUTRAL names only (ATLAS_*); no consumer namespace (no DF_*/BESKAR_*).
+# Each consumer maps the neutral names to its own (dotFiles' df_bootstrap maps
+# ATLAS_* -> DF_*; Beskar maps to BESKAR_*). The only path a job must know to
+# reach this script is /opt/trove (or $TROVE_HOME in its environment).
+#
+# Output is POSIX-sh compatible: `export ATLAS_KEY='value'` (single-quoted,
+# safely escaped), consumable from bash/sh as well as zsh.
+
+emulate -L zsh
+setopt no_unset 2>/dev/null
+
+TROVE_HOME="${TROVE_HOME:-${0:A:h:h}}"
+
+if [[ ! -f "${TROVE_HOME}/lib/trove_atlas.zsh" ]]; then
+    print -r -- "# atlas-env: cannot locate trove_atlas.zsh under ${TROVE_HOME}/lib" >&2
+    exit 3
+fi
+source "${TROVE_HOME}/lib/trove_atlas.zsh"
+
+# Emit a single export line if the value is non-empty.
+# Uses ${(qq)} single-quoting so the line is safe for POSIX sh.
+_atlas_emit() {
+    local name="$1" value="$2"
+    [[ -n "$value" ]] || return 0
+    print -r -- "export ${name}=${(qq)value}"
+}
+
+# Resolve + emit one neutral name from an Atlas key, with an optional default.
+_atlas_emit_key() {
+    local name="$1" key="$2" default="${3:-}"
+    local value
+    if value="$(trove_atlas_get "$key" "$default")"; then
+        _atlas_emit "$name" "$value"
+    fi
+}
+
+# Instance facts (no safe default for primary_user / config_home — emitted only
+# when resolvable; consumers that require them fail loud on their own side).
+_atlas_emit_key ATLAS_PRIMARY_USER  primary_user
+_atlas_emit_key ATLAS_GROUP         group         dotfiles
+_atlas_emit_key ATLAS_INSTALL_ROOT  install_root
+_atlas_emit_key ATLAS_CONFIG_HOME   config_home
+
+# Tool install paths (always resolvable — fixed /opt defaults).
+_atlas_emit ATLAS_TROVE    "$(trove_atlas_tool trove)"
+_atlas_emit ATLAS_BESKAR   "$(trove_atlas_tool beskar)"
+_atlas_emit ATLAS_DOTFILES "$(trove_atlas_tool dotfiles)"
+
+# Any additional app entries recorded in the registry, emitted generically.
+# (Skips the keys already handled above to avoid duplicates.)
+typeset -A _atlas_seen=(
+    primary_user 1 group 1 install_root 1 config_home 1
+    trove 1 beskar 1 dotfiles 1
+)
+while IFS= read -r _line; do
+    [[ "$_line" == *=* ]] || continue
+    _k="${_line%%=*}"
+    _v="${_line#*=}"
+    [[ -n "${_atlas_seen[$_k]:-}" ]] && continue
+    _atlas_emit "ATLAS_${(U)_k}" "$_v"
+done < <(trove_atlas_dump 2>/dev/null)
+
+exit 0

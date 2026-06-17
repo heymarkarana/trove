@@ -2,11 +2,11 @@
 
 @setup {
   # Source all libraries
-  source "/opt/trove/lib/trove_logging.zsh"
-  source "/opt/trove/lib/trove_colors.zsh"
-  source "/opt/trove/lib/trove_helpers.zsh"
-  source "/opt/trove/lib/trove_monitoring.zsh"
-  source "/opt/trove/lib/trove_date.zsh"
+  source "${TROVE_HOME}/lib/trove_logging.zsh"
+  source "${TROVE_HOME}/lib/trove_colors.zsh"
+  source "${TROVE_HOME}/lib/trove_helpers.zsh"
+  source "${TROVE_HOME}/lib/trove_monitoring.zsh"
+  source "${TROVE_HOME}/lib/trove_date.zsh"
 
   # Create temp directory
   TROVE_TEST_DIR="/tmp/trove_integration_$$"
@@ -71,34 +71,34 @@
 
 @test 'logging works without other libraries' {
   # Start fresh shell and only load logging
-  run zsh -c 'source /opt/trove/lib/trove_logging.zsh && trove_log INFO "test"'
+  run zsh -c 'source ${TROVE_HOME}/lib/trove_logging.zsh && trove_log INFO "test"'
 
   assert $state equals 0
   assert "$output" is_not_empty
 }
 
 @test 'colors work without other libraries' {
-  run zsh -c 'source /opt/trove/lib/trove_colors.zsh && echo ${COL_RED}'
+  run zsh -c 'source ${TROVE_HOME}/lib/trove_colors.zsh && echo ${COL_RED}'
 
   assert $state equals 0
   assert "$output" is_not_empty
 }
 
 @test 'helpers work without other libraries' {
-  run zsh -c 'source /opt/trove/lib/trove_helpers.zsh && trove_command_exists ls'
+  run zsh -c 'source ${TROVE_HOME}/lib/trove_helpers.zsh && trove_command_exists ls'
 
   assert $state equals 0
 }
 
 @test 'monitoring works without other libraries' {
-  run zsh -c 'source /opt/trove/lib/trove_monitoring.zsh && trove_get_hostname'
+  run zsh -c 'source ${TROVE_HOME}/lib/trove_monitoring.zsh && trove_get_hostname'
 
   assert $state equals 0
   assert "$output" is_not_empty
 }
 
 @test 'date works without other libraries' {
-  run zsh -c 'source /opt/trove/lib/trove_date.zsh && trove_timestamp_iso'
+  run zsh -c 'source ${TROVE_HOME}/lib/trove_date.zsh && trove_timestamp_iso'
 
   assert $state equals 0
   assert "$output" is_not_empty
@@ -109,8 +109,8 @@
 @test 'color scheme can be set before loading logging' {
   run zsh -c '
     export TROVE_COLORSCHEME="nord"
-    source /opt/trove/lib/trove_colors.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_colors.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
     echo ${TROVE_CURRENT_COLORSCHEME}
   '
 
@@ -120,8 +120,8 @@
 
 @test 'logging with colors works' {
   run zsh -c '
-    source /opt/trove/lib/trove_colors.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_colors.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
     trove_log INFO "colored message"
   '
 
@@ -131,8 +131,8 @@
 
 @test 'logging with timestamps works' {
   run zsh -c '
-    source /opt/trove/lib/trove_date.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_date.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
     timestamp=$(trove_timestamp_iso)
     trove_log INFO "Message at ${timestamp}"
   '
@@ -144,8 +144,8 @@
 @test 'monitoring with logging works' {
   run zsh -c '
     export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
-    source /opt/trove/lib/trove_monitoring.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_monitoring.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
     hostname=$(trove_get_hostname)
     trove_log INFO "Hostname: ${hostname}"
   '
@@ -156,8 +156,8 @@
 
 @test 'helpers with logging works' {
   run zsh -c '
-    source /opt/trove/lib/trove_helpers.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_helpers.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
     if trove_command_exists ls; then
       trove_log INFO "ls command found"
     fi
@@ -171,10 +171,10 @@
 
 @test 'complete workflow: check system and log results' {
   run zsh -c '
-    source /opt/trove/lib/trove_colors.zsh
-    source /opt/trove/lib/trove_logging.zsh
-    source /opt/trove/lib/trove_monitoring.zsh
-    source /opt/trove/lib/trove_date.zsh
+    source ${TROVE_HOME}/lib/trove_colors.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_monitoring.zsh
+    source ${TROVE_HOME}/lib/trove_date.zsh
 
     trove_set_colorscheme "monokai"
     timestamp=$(trove_timestamp_iso)
@@ -196,8 +196,8 @@
   touch "${TROVE_TEST_DIR}/testfile"
 
   run zsh -c "
-    source /opt/trove/lib/trove_helpers.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_helpers.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
 
     if trove_path_exists '${TROVE_TEST_DIR}/testfile'; then
       trove_log INFO 'File exists'
@@ -212,8 +212,8 @@
 
 @test 'complete workflow: measure duration and format' {
   run zsh -c '
-    source /opt/trove/lib/trove_date.zsh
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/lib/trove_date.zsh
+    source ${TROVE_HOME}/lib/trove_logging.zsh
 
     start=$(trove_timestamp_unix)
     sleep 0.1
@@ -231,22 +231,36 @@
 # Configuration integration tests
 
 @test 'config file exists' {
-  run test -f /opt/trove/config/trove.conf
+  run test -f ${TROVE_HOME}/config/trove.conf
 
   assert $state equals 0
 }
 
 @test 'can source config file' {
-  run zsh -c 'source /opt/trove/config/trove.conf && echo "loaded"'
+  run zsh -c 'source ${TROVE_HOME}/config/trove.conf && echo "loaded"'
 
   assert $state equals 0
   assert "$output" contains "loaded"
 }
 
+@test 'config file is auto-sourced by trove_init' {
+  run zsh -c 'source ${TROVE_HOME}/lib/trove_init.zsh && echo "scheme=${TROVE_COLORSCHEME}"'
+
+  assert $state equals 0
+  assert "$output" contains "scheme="
+}
+
+@test 'an explicit env var overrides the config file' {
+  run zsh -c 'TROVE_COLORSCHEME=nord; source ${TROVE_HOME}/config/trove.conf; echo "${TROVE_COLORSCHEME}"'
+
+  assert $state equals 0
+  assert "$output" same_as 'nord'
+}
+
 @test 'config and libraries work together' {
   run zsh -c '
-    source /opt/trove/config/trove.conf
-    source /opt/trove/lib/trove_logging.zsh
+    source ${TROVE_HOME}/config/trove.conf
+    source ${TROVE_HOME}/lib/trove_logging.zsh
     trove_log INFO "Config loaded"
   '
 

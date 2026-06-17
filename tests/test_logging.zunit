@@ -2,7 +2,7 @@
 
 @setup {
   # Source the logging library
-  source "/opt/trove/lib/trove_logging.zsh"
+  source "${TROVE_HOME}/lib/trove_logging.zsh"
 
   # Silence output for cleaner test results
   export TROVE_DISPLAY_OUTPUT=0
@@ -166,5 +166,57 @@
   run trove_log INFO "test message"
 
   # Should still execute but output might be empty
+  assert $state equals 0
+}
+
+###############################################################################
+# v1.0 additions: trove_error, logging-off, injection-safe silent_run
+###############################################################################
+
+@test 'trove_error is a shorthand for trove_log ERROR' {
+  run trove_error "boom"
+  assert $state equals 0
+  assert "$output" contains "boom"
+}
+
+@test 'TROVE_ENABLE_LOGGING=false suppresses trove_log output' {
+  trove_set_logging_enabled false
+  run trove_log INFO "should be hidden"
+  trove_set_logging_enabled true
+  assert "$output" is_empty
+}
+
+@test 'TROVE_ENABLE_LOGGING=false suppresses specialized output too' {
+  trove_set_logging_enabled false
+  run trove_ok "hidden"
+  trove_set_logging_enabled true
+  assert "$output" is_empty
+}
+
+@test 'logging can be re-enabled after being turned off' {
+  trove_set_logging_enabled false
+  trove_set_logging_enabled true
+  run trove_log INFO "visible"
+  assert "$output" contains "visible"
+}
+
+@test 'trove_set_logging_enabled rejects an invalid value' {
+  run trove_set_logging_enabled maybe
+  assert $state equals 1
+}
+
+@test 'trove_silent_run does not evaluate embedded command substitution' {
+  local marker="${TROVE_TEST_DIR:-/tmp}/SILENTRUN_PWNED_$$"
+  rm -f "$marker"
+  trove_set_output_display false
+  run trove_silent_run "echo \$(touch ${marker})" "injection attempt" DEBUG
+  # The substitution must NOT have executed (no file created).
+  run zsh -c "[[ -e '${marker}' ]] && echo PWNED || echo SAFE"
+  assert "$output" same_as 'SAFE'
+}
+
+@test 'trove_silent_run runs a simple command with arguments' {
+  trove_set_output_display false
+  run trove_silent_run "true" "ran true" DEBUG
   assert $state equals 0
 }

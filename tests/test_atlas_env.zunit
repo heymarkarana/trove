@@ -1,0 +1,49 @@
+#!/usr/bin/env zunit
+
+@setup {
+  : ${TROVE_HOME:=$PWD}
+  export TROVE_HOME
+
+  TROVE_TEST_DIR="/tmp/trove_atlasenv_test_$$"
+  mkdir -p "${TROVE_TEST_DIR}"
+  export ATLAS_REGISTRY="${TROVE_TEST_DIR}/registry"
+
+  source "${TROVE_HOME}/lib/trove_atlas.zsh"
+  trove_atlas_sync \
+    primary_user=alice \
+    group=devs \
+    install_root=/opt/myapp \
+    config_home=/opt/myapp/.config/dotFiles \
+    beskar=/custom/beskar \
+    myapp=/opt/things/myapp >/dev/null
+}
+
+@teardown {
+  rm -rf "${TROVE_TEST_DIR}"
+  unset ATLAS_REGISTRY
+}
+
+@test 'atlas-env emits neutral ATLAS_* export lines' {
+  run zsh "${TROVE_HOME}/bin/atlas-env"
+  assert $state equals 0
+  assert "$output" contains "export ATLAS_PRIMARY_USER='alice'"
+  assert "$output" contains "export ATLAS_INSTALL_ROOT='/opt/myapp'"
+  assert "$output" contains "export ATLAS_BESKAR='/custom/beskar'"
+}
+
+@test 'atlas-env emits arbitrary registry app entries generically' {
+  run zsh "${TROVE_HOME}/bin/atlas-env"
+  assert "$output" contains "export ATLAS_MYAPP='/opt/things/myapp'"
+}
+
+@test 'atlas-env output leaks no consumer-namespace variables' {
+  run zsh -c "zsh '${TROVE_HOME}/bin/atlas-env' | grep -cE 'DF_[A-Z]|BESKAR_[A-Z]'"
+  assert "$output" same_as '0'
+}
+
+@test 'atlas-env output is consumable from bash with no HOME (env -i)' {
+  run env -i TROVE_HOME="${TROVE_HOME}" ATLAS_REGISTRY="${ATLAS_REGISTRY}" \
+    /bin/bash -c 'eval "$(zsh "${TROVE_HOME}/bin/atlas-env")"; echo "$ATLAS_PRIMARY_USER:$ATLAS_INSTALL_ROOT"'
+  assert $state equals 0
+  assert "$output" same_as 'alice:/opt/myapp'
+}

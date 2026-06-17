@@ -27,7 +27,10 @@ fi
 : ${TROVE_COLORSCHEME:=monokai}
 
 # Internal configuration
-TROVE_ENABLE_LOGGING=true
+# TROVE_ENABLE_LOGGING gates ALL Trove output. Respect a value already in the
+# environment (so `TROVE_ENABLE_LOGGING=false` / dotFiles `log NONE` maps to a
+# real "output off" state) and default to on.
+: ${TROVE_ENABLE_LOGGING:=true}
 TROVE_LOG_LEVEL_INTERNAL="${TROVE_LOG_LEVEL}"
 TROVE_OUTPUT_DISPLAY_INTERNAL="${TROVE_OUTPUT_DISPLAY}"
 
@@ -121,6 +124,12 @@ trove_show_help() {
 # Core Logging Functions
 ###############################################################################
 
+# Returns 0 when Trove output is enabled, 1 when disabled.
+# Honors TROVE_ENABLE_LOGGING (true/false); dotFiles `log NONE` sets it false.
+_trove_logging_enabled() {
+    [[ "${TROVE_ENABLE_LOGGING:-true}" == true ]]
+}
+
 # Function to get numeric log level for comparison
 trove_log_level_num() {
     case $1 in
@@ -142,14 +151,14 @@ trove_log() {
     # If not a known level, treat it as plain message
     if [[ ! "$level" =~ ^(FATAL|ERROR|WARN|INFO|DEBUG|TRACE)$ ]]; then
         local message="${level} $*"
-        if ${TROVE_ENABLE_LOGGING}; then
+        if _trove_logging_enabled; then
             echo "${message}" >&2
         fi
         return
     fi
 
     local message="$*"
-    if ${TROVE_ENABLE_LOGGING}; then
+    if _trove_logging_enabled; then
         local current_level_num=$(trove_log_level_num "${TROVE_LOG_LEVEL_INTERNAL}")
         local message_level_num=$(trove_log_level_num "${level}")
 
@@ -174,13 +183,21 @@ trove_log() {
 # Specialized Output Functions
 ###############################################################################
 
+# Error convenience wrapper (shorthand for `trove_log ERROR`)
+# Usage: trove_error "message"
+trove_error() {
+    trove_log ERROR "$@"
+}
+
 # Success indicator
 trove_ok() {
+    _trove_logging_enabled || return 0
     printf "${COL_GREEN}    [➤] ${COL_RESET}%s\n" "$1" >&2
 }
 
 # Major section announcement
 trove_bot() {
+    _trove_logging_enabled || return 0
     echo "" >&2
     echo "" >&2
     printf "${COL_BOLD_PURPLE}    [✪] ${COL_RESET}%s \n" "$1" >&2
@@ -188,11 +205,13 @@ trove_bot() {
 
 # Configuration step indicator
 trove_running() {
+    _trove_logging_enabled || return 0
     printf "${COL_ORANGE}   [✨] ${COL_RESET}%s \n" "$1" >&2
 }
 
 # Full-width header for user input sections
 trove_action() {
+    _trove_logging_enabled || return 0
     local message="  $1"
     local term_width=$(tput cols 2>/dev/null || echo 80)
     local padded_message="${COL_WHITE}${message}$(printf '%*s' $((term_width - ${#message})) '')"
@@ -206,11 +225,13 @@ trove_action() {
 
 # Print error message
 trove_print_error() {
+    _trove_logging_enabled || return 0
     printf "${COL_RED}    [✖] ${COL_RESET}%s\n" "$1" >&2
 }
 
 # Print success message
 trove_print_success() {
+    _trove_logging_enabled || return 0
     printf "${COL_GREEN}    [✔] ${COL_RESET}%s\n" "$1" >&2
 }
 
@@ -233,19 +254,30 @@ trove_print_result() {
 # If TROVE_OUTPUT_DISPLAY is true, writes stdout to display
 # If false, redirects stdout to /dev/null
 # Usage: trove_silent_run "command_to_execute" "Log message" "Log level (default: DEBUG)"
+#
+# The command string is tokenized into an argv array honoring quotes
+# (`${(Q)${(z)...}}`) and run directly — NOT through `eval`. This removes the
+# shell-injection surface: parameter/command substitutions embedded in the
+# string are passed as literal arguments, never executed. The command therefore
+# runs as a single program with arguments; a caller that genuinely needs a
+# pipeline or redirection must request a shell explicitly, e.g.
+#     trove_silent_run 'zsh -c "foo | bar"' "Message"
 trove_silent_run() {
     local cmd="$1"                    # Command to execute
     local log_message="$2"            # Message to log
     local log_level="${3:-DEBUG}"     # Log level (default to DEBUG)
     local result                      # Stores the result of the command
 
+    local -a argv_cmd
+    argv_cmd=( ${(Q)${(z)cmd}} )
+
     if [[ "${TROVE_OUTPUT_DISPLAY_INTERNAL:-false}" == true ]]; then
         # Display command output
-        eval "${cmd}"
+        "${argv_cmd[@]}"
         result=$?
     else
         # Suppress stdout
-        eval "$cmd" >/dev/null 2>&1
+        "${argv_cmd[@]}" >/dev/null 2>&1
         result=$?
     fi
 
@@ -287,6 +319,20 @@ trove_set_output_display() {
         trove_log ERROR "Invalid output display value: $value (must be true or false)"
         return 1
     fi
+}
+
+# Enable/disable ALL Trove output ("logging off"). dotFiles `log NONE` -> off.
+# Usage: trove_set_logging_enabled <true|false>
+trove_set_logging_enabled() {
+    local value="$1"
+    if [[ "$value" =~ ^(true|false)$ ]]; then
+        TROVE_ENABLE_LOGGING="$value"
+        export TROVE_ENABLE_LOGGING="$value"
+        return 0
+    fi
+    # Reported before any disable takes effect, so this is always visible.
+    trove_log ERROR "Invalid logging-enabled value: $value (must be true or false)"
+    return 1
 }
 
 ###############################################################################

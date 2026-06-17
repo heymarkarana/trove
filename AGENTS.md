@@ -6,9 +6,9 @@ This file is the authoritative context for AI assistants working in this reposit
 
 ## What this repository is
 
-Trove is a **shared shell utilities library** providing consistent logging, color output, system helpers, date/time utilities, and system monitoring functions for zsh scripts. It also ships `klog`, a CLI binary that exposes Trove logging to any language (Python, Go, Rust, etc.).
+Trove is a **shared shell utilities library** providing consistent logging, color output, **Atlas discovery**, system helpers, date/time utilities, and system monitoring functions for zsh scripts. It also ships CLI facades — `klog` (logging), `kreq` (requirements), and `atlas-env` (discovery exports). These are **zsh scripts, not compiled binaries**; they expose Trove to any language (Python, Go, Rust, etc.).
 
-Trove is a dependency of dotFiles and Beskar — it is installed first during bootstrap (`/opt/trove`) and loaded by `dotFiles/lib/df_bootstrap.zsh` before any install step runs.
+Trove is a dependency of dotFiles and Beskar — it is installed first during bootstrap (`/opt/trove`) and loaded by `dotFiles/lib/df_bootstrap.zsh` before any install step runs. It owns **Atlas**, the discovery layer all tiers consume.
 
 ---
 
@@ -22,11 +22,12 @@ Trove is a dependency of dotFiles and Beskar — it is installed first during bo
 | `lib/trove_date.zsh` | Date/time formatting and arithmetic |
 | `lib/trove_monitoring.zsh` | CPU, memory, disk metrics |
 | `lib/trove_requirements.zsh` | Dependency checking and optional installation |
-| `lib/trove_init.zsh` | Library initialization |
-| `bin/klog` | CLI logging binary for non-shell callers |
-| `bin/kreq` | CLI requirements checker for non-shell callers |
-| `config/` | Default and local config |
-| `tests/` | Test suite — run with `bash tests/run_tests.sh` |
+| `lib/trove_atlas.zsh` | Atlas discovery reader (`trove_atlas_*`) |
+| `lib/trove_init.zsh` | Core initialization (auto-loads logging + colors + Atlas) |
+| `bin/klog` | CLI logging facade (zsh script) for non-shell callers |
+| `bin/kreq` | CLI requirements facade (zsh script) for non-shell callers |
+| `bin/atlas-env` | Emits neutral `ATLAS_*` discovery exports (cron/system safe) |
+| `tests/` | Test suite (zunit) — run with `bash tests/run_tests.sh` |
 | `examples/` | Usage examples |
 | `docs/API.md` | Full function reference |
 
@@ -34,22 +35,30 @@ Trove is a dependency of dotFiles and Beskar — it is installed first during bo
 
 ## Architecture rules — must follow
 
-### 1. Nothing hardcoded
+### 1. Nothing hardcoded — discover via Atlas
 
-Do not hardcode `/opt/trove` in scripts that consume Trove. Use `$TROVE_PATH` (set by `df_bootstrap`) or discover it via the standard search order:
+`TROVE_HOME` is the canonical variable for Trove's own location (`TROVE_PATH` is
+accepted as a deprecated read-only alias; never write it). Everything else —
+other tools, instance facts — resolves through **Atlas**, never hardcoded paths
+and never `$HOME`-derived:
 
-1. `$DF_TROVE_PATH` (if set)
-2. `/opt/trove`
-3. `$DF_APP_INSTALL_DIRECTORY/trove`
-4. `$HOME/.local/share/trove`
+```zsh
+trove_atlas_tool beskar          # resolve a tool install path
+trove_atlas_require primary_user # resolve an instance fact (fail loud if absent)
+eval "$(atlas-env)"              # in cron/system contexts with no $HOME
+```
 
 ```zsh
 # Wrong
 source /opt/trove/lib/trove_logging.zsh
 
-# Right (when called from dotFiles context)
-source "${TROVE_PATH}/lib/trove_logging.zsh"
+# Right
+source "${TROVE_HOME}/lib/trove_init.zsh"
 ```
+
+Atlas itself stays tier-pure: **no `DF_*` or `BESKAR_*` references** in
+`trove_atlas.zsh` or `bin/atlas-env` — they emit/resolve neutral `ATLAS_*`
+names only; each consumer maps them to its own namespace.
 
 ### 2. No homelab identity in code
 
@@ -86,11 +95,13 @@ source "${TROVE_PATH}/lib/trove_logging.zsh"
 | Function | Purpose |
 |---|---|
 | `trove_log LEVEL "msg"` | Level-filtered log — levels: TRACE DEBUG INFO WARN ERROR FATAL |
+| `trove_error "msg"` | Shorthand for `trove_log ERROR` |
 | `trove_bot "msg"` | Major section header |
 | `trove_running "msg"` | In-progress step indicator |
 | `trove_ok "msg"` | Success confirmation |
 | `trove_action "msg"` | User-input section header |
-| `trove_silent_run "cmd" "label"` | Execute command, log result |
+| `trove_silent_run "cmd" "label"` | Execute command (no `eval`), log result |
+| `trove_set_logging_enabled false` | Silence all output (`TROVE_ENABLE_LOGGING`) |
 
 ### Helpers (`trove_helpers.zsh`)
 
@@ -103,6 +114,17 @@ source "${TROVE_PATH}/lib/trove_logging.zsh"
 | `trove_get_env "VAR" "default"` | Read env var with fallback |
 | `trove_is_root` | True if running as root |
 | `trove_is_macos` / `trove_is_ubuntu` | Platform detection |
+| `trove_stat_owner` / `trove_stat_group` / `trove_stat_mode` | Portable owner/group/octal-mode (macOS + Linux) |
+
+### Atlas discovery (`trove_atlas.zsh`, core)
+
+| Function | Purpose |
+|---|---|
+| `trove_atlas_get <key> [default]` | Resolve env → registry → default |
+| `trove_atlas_require <key>` | Resolve or fail loud (instance facts) |
+| `trove_atlas_tool <trove\|beskar\|dotfiles>` | Resolve a tool install path |
+| `trove_atlas_set/unset <key> [val]` | Mutate the registry idempotently |
+| `trove_atlas_dump` / `trove_atlas_sync k=v…` | Print / rebuild the registry |
 
 ### Requirements (`trove_requirements.zsh`)
 
@@ -149,16 +171,16 @@ trove_set_log_level "DEBUG"
 trove_set_output_display false
 ```
 
-### `klog` binary
+### `klog` facade (zsh script, not a compiled binary)
 
 For logging from non-shell programs:
 
 ```zsh
-/opt/trove/bin/klog INFO  "message"
-/opt/trove/bin/klog ERROR "message"
+"${TROVE_HOME}/bin/klog" INFO  "message"
+"${TROVE_HOME}/bin/klog" ERROR "message"
 ```
 
-Or via `$TROVE_PATH/bin/klog` — never hardcode the path.
+Resolve the path via `$TROVE_HOME` (or a `klog` on `PATH`) — never hardcode it.
 
 ---
 
@@ -213,15 +235,17 @@ func klog(level, message string) {
 
 ## Configuration
 
+Trove reads an optional `config/trove.conf` (auto-sourced by `trove_init.zsh`)
+plus these environment variables. Precedence: **env var > `config/trove.conf` >
+built-in default**.
+
 ```zsh
 export TROVE_LOG_LEVEL="INFO"        # TRACE DEBUG INFO WARN ERROR FATAL
 export TROVE_COLORSCHEME="monokai"   # monokai solarized nord dracula gruvbox
-export TROVE_OUTPUT_DISPLAY="true"   # show command output
-export TROVE_MONITORING_ENABLED="true"
-export TROVE_MONITORING_URL="https://monitoring.example.com"
+export TROVE_OUTPUT_DISPLAY="true"   # show command output in trove_silent_run
+export TROVE_ENABLE_LOGGING="true"   # set false to silence ALL Trove output
+export ATLAS_REGISTRY="/opt/.atlas/registry"   # registry path override (tests/dev)
 ```
-
-Local config overrides go in `config/trove.local.conf` (gitignored).
 
 ---
 

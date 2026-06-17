@@ -14,6 +14,10 @@ NC='\033[0m' # No Color
 # Test directory
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Resolve the repo root and export TROVE_HOME so the suites test THIS checkout
+# (not a deployed /opt/trove). Tests source "${TROVE_HOME}/lib/...".
+export TROVE_HOME="$(cd "${TEST_DIR}/.." && pwd)"
+
 echo "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo "${BLUE}║     Trove Test Suite with zunit       ║${NC}"
 echo "${BLUE}╚════════════════════════════════════════╝${NC}"
@@ -60,9 +64,12 @@ for test_file in "${TEST_FILES[@]}"; do
     ((FAILED++))
   fi
 
-  # Extract test counts from output
+  # Extract test counts from output.
+  # zunit prints "<n> tests run in <ms>" and a "✔ Passed   <n>" summary line; the
+  # count is the LAST whitespace-separated field on each (robust to the leading
+  # glyph/color codes).
   suite_total=$(echo "$output" | grep "tests run in" | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $1}')
-  suite_passed=$(echo "$output" | grep "Passed" | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $2}')
+  suite_passed=$(echo "$output" | grep "Passed" | sed 's/\x1b\[[0-9;]*m//g' | awk '{print $NF}')
 
   if [[ -n "$suite_total" ]]; then
     ((TOTAL_TESTS += suite_total))

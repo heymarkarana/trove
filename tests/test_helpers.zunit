@@ -2,7 +2,7 @@
 
 @setup {
   # Source the helpers library
-  source "/opt/trove/lib/trove_helpers.zsh"
+  source "${TROVE_HOME}/lib/trove_helpers.zsh"
 
   # Create temporary test directory
   TROVE_TEST_DIR="/tmp/trove_test_$$"
@@ -256,3 +256,39 @@
 
 # trove_contains doesn't exist in the helpers library
 # Removing these tests as the function is not implemented
+
+###############################################################################
+# Portable stat helpers (added for v1.0 — used by dotFiles df_perms/heal)
+###############################################################################
+
+@test 'trove_stat_owner returns the owning username' {
+  touch "${TROVE_TEST_DIR}/ownedfile"
+  run trove_stat_owner "${TROVE_TEST_DIR}/ownedfile"
+  assert $state equals 0
+  assert "$output" same_as "$(id -un)"
+}
+
+@test 'trove_stat_owner fails for a missing path' {
+  run trove_stat_owner "${TROVE_TEST_DIR}/nope"
+  assert $state equals 1
+}
+
+@test 'trove_stat_mode returns octal permission bits' {
+  touch "${TROVE_TEST_DIR}/modefile"
+  chmod 640 "${TROVE_TEST_DIR}/modefile"
+  run trove_stat_mode "${TROVE_TEST_DIR}/modefile"
+  assert "$output" same_as '640'
+}
+
+@test 'trove_stat_mode reflects a changed mode' {
+  touch "${TROVE_TEST_DIR}/modefile2"
+  chmod 600 "${TROVE_TEST_DIR}/modefile2"
+  run trove_stat_mode "${TROVE_TEST_DIR}/modefile2"
+  assert "$output" same_as '600'
+}
+
+@test 'trove_stat_group returns the owning group' {
+  touch "${TROVE_TEST_DIR}/groupfile"
+  run trove_stat_group "${TROVE_TEST_DIR}/groupfile"
+  assert "$output" is_not_empty
+}

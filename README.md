@@ -1,19 +1,26 @@
-# Trove - Shared Utilities Library
+# Trove — Shared Utilities Library
 
-**Version**: 0.1.0-beta
+**Version**: 1.0.0
 
-A collection of reusable shell utilities for the kuzcotopia ecosystem. Trove provides logging, color schemes, monitoring helpers, and common utilities that can be used across multiple applications.
+A collection of reusable zsh utilities: structured logging, color schemes,
+discovery (Atlas), monitoring helpers, and common path/system helpers. Trove is
+the foundation layer other tools build on — it has no dependencies of its own.
 
 ---
 
 ## Features
 
-- 🎨 **Color Schemes** - Multiple themes (Monokai, Solarized, Nord, Dracula)
-- 📝 **Structured Logging** - Level-filtered logging with colored output
-- 📊 **Monitoring Helpers** - System metrics for Beszel, Arcane, etc.
-- 🛠️ **Path Utilities** - Validation, permission checking, directory helpers
-- 📅 **Date Utilities** - Timestamp formatting, date arithmetic, timezone helpers
-- 🚀 **CLI Binary** - `klog` executable for compiled applications
+- 🧭 **Atlas Discovery** — find where tools and instance config live, from any
+  context (cron, systemd, root, another user), without relying on `$HOME`
+- 📝 **Structured Logging** — level-filtered logging with colored output
+- 🎨 **Color Schemes** — Monokai, Solarized, Nord, Dracula, Gruvbox
+- 📊 **Monitoring Helpers** — system metrics for monitoring integrations
+- 🛠️ **Helpers** — path validation, portable stat, permission checks, platform detection
+- 📅 **Date Utilities** — timestamp formatting, date arithmetic, durations
+- 🚀 **CLI facades** — `klog` (logging), `kreq` (requirements), `atlas-env` (discovery)
+
+> `klog`, `kreq`, and `atlas-env` are **zsh scripts**, not compiled binaries.
+> They are thin CLI facades over the libraries, callable from any language.
 
 ---
 
@@ -21,166 +28,134 @@ A collection of reusable shell utilities for the kuzcotopia ecosystem. Trove pro
 
 ### Installation
 
-```bash
-# Clone or download to /opt/trove
-cd /opt/trove
+```sh
+# From the Trove checkout (default install root is /opt/trove):
 ./install
-
-# Add to PATH (optional)
-export PATH="/opt/trove/bin:$PATH"
 ```
 
-### Usage in Shell Scripts
+The installer is bash (so it runs on a box without zsh yet). It ensures Trove's
+one runtime dependency — **zsh** — is present (installing it via the platform
+package manager if missing), then validates the tree, sets permissions, and
+symlinks the CLI facades into a standard bin dir (or tells you how to add them to
+`PATH`). Beyond ensuring zsh it does **not** provision the machine: no Homebrew,
+Xcode, SSH keys, 1Password, Python venvs, or default-shell (`chsh`) changes —
+those belong to bootstrap/dotFiles.
 
-```bash
-#!/bin/bash
-# Source the libraries
-source /opt/trove/lib/trove_logging.zsh
-source /opt/trove/lib/trove_colors.zsh
+### Usage in shell
 
-# Set color scheme
-trove_set_colorscheme monokai
+```zsh
+# Source the core (logging + colors + Atlas):
+source /opt/trove/lib/trove_init.zsh
 
-# Use logging functions
 trove_log INFO "Starting application"
 trove_bot "Major Task"
 trove_running "Configuring system"
 trove_ok "Configuration complete"
+trove_error "Something went wrong"
+
+# Load optional modules on demand:
+trove_load helpers
+trove_load date
 ```
 
-### Usage from Binaries
+### Usage from the CLIs
 
-```bash
-# From any compiled application (Go, Rust, Python, etc.)
-/opt/trove/bin/klog INFO "Application started"
-/opt/trove/bin/klog ERROR "Connection failed"
-
-# Or add to PATH
-klog WARN "Low disk space detected"
+```sh
+klog INFO "Application started"
+klog ERROR "Connection failed"
+kreq check zsh
+eval "$(atlas-env)"        # export ATLAS_* discovery values (cron/system safe)
 ```
 
 ---
 
 ## Libraries
 
-### trove_logging.zsh
-Structured logging with multiple output functions:
-- `trove_log LEVEL "message"` - Level-filtered logging
-- `trove_bot "message"` - Major section headers
-- `trove_running "message"` - Configuration steps
-- `trove_action "message"` - User input headers
-- `trove_ok "message"` - Success confirmations
-- `trove_silent_run "cmd" "msg"` - Execute and log
+| Module | Loaded | Provides |
+|---|---|---|
+| `trove_logging.zsh` | core (auto) | `trove_log`, `trove_error`, `trove_ok`, `trove_bot`, `trove_running`, `trove_action`, `trove_silent_run`, level + display + on/off config |
+| `trove_colors.zsh` | core (auto) | `trove_set_colorscheme`, `trove_get_colorscheme`, `trove_show_colorschemes`, the `COL_*` globals (every scheme exported globally) |
+| `trove_atlas.zsh` | core (auto) | `trove_atlas_get/require/tool/set/unset/dump/sync` — discovery reader |
+| `trove_helpers.zsh` | `trove_load helpers` | path validation, permission checks, `trove_stat_owner/group/mode`, platform detection, env + string helpers |
+| `trove_date.zsh` | `trove_load date` | timestamps, date arithmetic, durations |
+| `trove_monitoring.zsh` | `trove_load monitoring` | disk/memory/CPU metrics, metric sender |
+| `trove_requirements.zsh` | `trove_load requirements` | dependency checking + version helpers |
 
-### trove_colors.zsh
-Color management with multiple schemes:
-- Monokai (default)
-- Solarized Dark/Light
-- Nord
-- Dracula
-- Gruvbox
+---
 
-### trove_helpers.zsh
-Path and system utilities:
-- Path validation and permission checking
-- Directory operations
-- Platform detection
-- Environment helpers
+## Atlas (discovery)
 
-### trove_monitoring.zsh
-System metrics for monitoring integrations:
-- Disk usage
-- Memory usage
-- CPU load
-- Generic metric sender
+Atlas resolves ecosystem paths and instance facts from a tiny registry at
+`/opt/.atlas/registry` (override with `ATLAS_REGISTRY` for tests). Resolution
+order is **env → registry → default**; instance facts with no safe default
+(`primary_user`, `config_home`) fail loud when unresolved.
 
-### trove_date.zsh
-Date and time utilities:
-- Timestamp formatting
-- Date arithmetic
-- Timezone handling
-- Duration calculations
+```zsh
+trove_atlas_get config_home              # env ATLAS_CONFIG_HOME → registry → (none)
+trove_atlas_require primary_user         # fail loud if unresolved
+trove_atlas_tool beskar                  # resolve a tool install path
+trove_atlas_sync primary_user=alice group=devs install_root=/opt/app config_home=/opt/app/.config/dotFiles
+```
+
+`atlas-env` emits **neutral** `ATLAS_*` export lines (no consumer-specific
+names) so cron/systemd jobs can learn absolute paths with no `$HOME`:
+
+```sh
+eval "$(/opt/trove/bin/atlas-env)"
+# now $ATLAS_PRIMARY_USER, $ATLAS_INSTALL_ROOT, $ATLAS_CONFIG_HOME, … are set
+```
+
+The registry is non-secret discovery data (dir `2755`, file `644`). It is never
+committed and never backed up — it is rebuildable on demand via
+`trove_atlas_sync`.
 
 ---
 
 ## Configuration
 
-Edit `/opt/trove/config/trove.conf`:
+Trove reads an optional `config/trove.conf` (auto-sourced by `trove_init.zsh`)
+and these environment variables. Precedence: **env var > `config/trove.conf` >
+built-in default**. Delete `trove.conf` to configure purely by environment.
 
-```bash
-TROVE_LOG_LEVEL="INFO"           # TRACE|DEBUG|INFO|WARN|ERROR|FATAL
-TROVE_COLORSCHEME="monokai"      # monokai|solarized|nord|dracula|gruvbox
-TROVE_OUTPUT_DISPLAY="true"      # Show output in terminal
-TROVE_MONITORING_ENABLED="false" # Enable monitoring helpers
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `TROVE_HOME` | script location | Trove install dir (canonical; `TROVE_PATH` is a deprecated read-only alias) |
+| `TROVE_LOG_LEVEL` | `INFO` | `TRACE`/`DEBUG`/`INFO`/`WARN`/`ERROR`/`FATAL` |
+| `TROVE_COLORSCHEME` | `monokai` | `monokai`/`solarized`/`nord`/`dracula`/`gruvbox` |
+| `TROVE_OUTPUT_DISPLAY` | `true` | show command output in `trove_silent_run` |
+| `TROVE_ENABLE_LOGGING` | `true` | set `false` to silence **all** Trove output |
+| `ATLAS_REGISTRY` | `/opt/.atlas/registry` | registry path override (tests/dev) |
 
----
-
-## Project Structure
-
-```
-/opt/trove/
-├── bin/
-│   └── klog                 # CLI executable
-├── lib/
-│   ├── trove_logging.zsh    # Logging functions
-│   ├── trove_colors.zsh     # Color schemes
-│   ├── trove_helpers.zsh    # Path/system helpers
-│   ├── trove_monitoring.zsh # Monitoring utilities
-│   └── trove_date.zsh       # Date/time utilities
-├── config/
-│   └── trove.conf           # Default configuration
-├── tests/
-│   └── *.bats               # Test suite
-├── docs/
-│   ├── API.md               # Function reference
-│   └── COLORSCHEMES.md      # Color scheme guide
-├── examples/
-│   └── *.sh                 # Usage examples
-├── VERSION                  # Semantic version
-├── install                  # Installation script
-├── LICENSE
-└── README.md
-```
+These can also be set at runtime: `trove_set_log_level`, `trove_set_colorscheme`,
+`trove_set_output_display`, `trove_set_logging_enabled`.
 
 ---
 
 ## Testing
 
-```bash
-# Run all tests
-cd /opt/trove
+Tests use [zunit](https://github.com/zunit-zsh/zunit):
+
+```sh
+# Run the whole suite (sets TROVE_HOME to this checkout):
 ./tests/run_tests.sh
 
-# Run specific test
-bats tests/test_logging.bats
+# Run a single suite:
+TROVE_HOME="$(pwd)" zunit tests/test_atlas.zunit
 ```
 
 ---
 
 ## Dependencies
 
-- **Required**: zsh (or bash)
-- **Optional**: bats (for running tests)
+- **Required**: zsh
+- **Optional**: zunit (tests), `flock` (registry write serialization)
 
 ---
 
 ## License
 
-Proprietary - The Secret Lab
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Deepcut Labs, LLC.
 
 ---
 
-## Version History
-
-**0.1.0-beta** (2026-03-18)
-- Initial beta release
-- Core logging system
-- Color schemes support
-- Monitoring helpers
-- Path and date utilities
-- klog CLI binary
-
----
-
-For detailed API documentation, see [docs/API.md](docs/API.md)
+For detailed API documentation, see [docs/API.md](docs/API.md).

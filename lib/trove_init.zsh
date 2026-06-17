@@ -25,11 +25,27 @@ if [[ ":$PATH:" != *":${TROVE_HOME}/bin:"* ]]; then
 fi
 
 ###############################################################################
+# Optional Config File
+###############################################################################
+# Auto-source config/trove.conf if present, BEFORE the libraries apply their
+# defaults. The file uses `: ${VAR:=...}` form, so precedence is:
+#   environment variable > config file > built-in default.
+if [[ -f "${TROVE_HOME}/config/trove.conf" ]]; then
+    source "${TROVE_HOME}/config/trove.conf"
+fi
+
+###############################################################################
 # Core Library Loading
 ###############################################################################
 # Auto-load core library (logging automatically loads colors)
 if [[ -f "${TROVE_HOME}/lib/trove_logging.zsh" ]]; then
     source "${TROVE_HOME}/lib/trove_logging.zsh"
+fi
+
+# Auto-load Atlas discovery — every tier depends on it, so it is core (not an
+# optional module). Pure reader; safe to source in any context (no $HOME needed).
+if [[ -f "${TROVE_HOME}/lib/trove_atlas.zsh" ]]; then
+    source "${TROVE_HOME}/lib/trove_atlas.zsh"
 fi
 
 ###############################################################################

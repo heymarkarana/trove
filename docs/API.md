@@ -2,12 +2,16 @@
 
 # Trove API Reference
 
-Complete API documentation for Trove v0.1.0-beta
+Complete API documentation for Trove v1.0.0
+
+> CLI facades `klog`, `kreq`, and `atlas-env` are **zsh scripts**, not compiled
+> binaries.
 
 ---
 
 ## Table of Contents
 
+- [Atlas Discovery](#atlas-discovery)
 - [Logging Functions](#logging-functions)
 - [Color Management](#color-management)
 - [Helper Utilities](#helper-utilities)
@@ -15,6 +19,47 @@ Complete API documentation for Trove v0.1.0-beta
 - [Date & Time Utilities](#date--time-utilities)
 - [Requirements](#requirements)
 - [Configuration](#configuration)
+
+---
+
+## Atlas Discovery
+
+Discovery reader (in `trove_atlas.zsh`, auto-loaded by the core). Resolves
+ecosystem paths and instance facts from `/opt/.atlas/registry` (override
+`ATLAS_REGISTRY`) with precedence **env → registry → default**. Pure data
+reader; works with no `$HOME`, as any user. Contains no `DF_*`/`BESKAR_*`
+references — it emits/resolves neutral `ATLAS_*` names only.
+
+#### `trove_atlas_get <key> [default]`
+Resolve a key: neutral env override `ATLAS_<UPPERCASE_KEY>` → registry → caller
+default. Prints the value (exit 0); prints nothing and returns 1 when unresolved
+and no default given.
+
+#### `trove_atlas_require <key>`
+Like `get`, but logs FATAL and returns 1 when unresolved. Use for instance facts
+that have no safe default (`primary_user`, `config_home`).
+
+#### `trove_atlas_tool <trove|beskar|dotfiles>`
+Resolve a tool install path (knows the fixed `/opt/<tool>` default; honors
+`TROVE_HOME` for the `trove` tool).
+
+#### `trove_atlas_set <key> <value>` / `trove_atlas_unset <key>`
+Write/update or remove a registry key idempotently (creates the store with the
+correct mode if missing).
+
+#### `trove_atlas_dump`
+Print the whole registry as `key=value` (comments/blank lines omitted).
+
+#### `trove_atlas_sync key=value [key=value ...]`
+Rebuild the registry from the provided facts (used by bootstrap/heal).
+
+#### `atlas-env`
+CLI facade that emits `export ATLAS_*='value'` lines (POSIX, bash/sh-consumable)
+for cron/system contexts:
+
+```sh
+eval "$(/opt/trove/bin/atlas-env)"
+```
 
 ---
 
@@ -42,6 +87,15 @@ trove_log DEBUG "Variable x = $x"
 - WARN: Yellow ⚠
 - ERROR: Red ✖
 - FATAL: Purple ‼
+
+#### `trove_error "message"`
+
+Shorthand for `trove_log ERROR "message"`.
+
+#### `trove_set_logging_enabled <true|false>`
+
+Enable or disable **all** Trove output (honors `TROVE_ENABLE_LOGGING`). Setting
+`false` silences `trove_log` and every specialized output function.
 
 ---
 
@@ -821,21 +875,25 @@ Set `TROVE_ALLOW_SUDO=1` to allow apt/snap install commands to run. Without it, 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TROVE_LOG_LEVEL` | INFO | Log level filter (TRACE\|DEBUG\|INFO\|WARN\|ERROR\|FATAL) |
-| `TROVE_OUTPUT_DISPLAY` | true | Show command output in terminal |
+| `TROVE_ENABLE_LOGGING` | true | Master output switch; `false` silences all Trove output |
+| `TROVE_OUTPUT_DISPLAY` | true | Show command output in `trove_silent_run` |
 | `TROVE_COLORSCHEME` | monokai | Color scheme (monokai\|solarized\|nord\|dracula\|gruvbox) |
 | `TROVE_MONITORING_ENABLED` | false | Enable monitoring integration |
 | `TROVE_MONITORING_URL` | "" | Monitoring system URL |
+| `ATLAS_REGISTRY` | /opt/.atlas/registry | Atlas registry path override (tests/dev) |
 
 ### Configuration File
 
-Edit `/opt/trove/config/trove.conf` to set defaults.
+`config/trove.conf` is auto-sourced by `trove_init.zsh` if present. Precedence
+is **environment variable > `config/trove.conf` > built-in default** (the file
+uses `: ${VAR:=...}` form). Delete it to configure purely by environment.
 
 **Example**:
-```bash
-TROVE_LOG_LEVEL="DEBUG"
-TROVE_COLORSCHEME="nord"
-TROVE_MONITORING_ENABLED="true"
-TROVE_MONITORING_URL="https://beszel.example.com"
+```zsh
+: ${TROVE_LOG_LEVEL:=DEBUG}
+: ${TROVE_COLORSCHEME:=nord}
+: ${TROVE_MONITORING_ENABLED:=true}
+: ${TROVE_MONITORING_URL:=https://monitor.example.internal}
 ```
 
 ---
@@ -963,9 +1021,9 @@ func main() {
 
 - [README.md](../README.md) - Overview and quick start
 - [Examples](../examples/) - Usage examples
-- [Configuration Guide](CONFIGURATION.md) - Configuration details
+- [Configuration](#configuration) - Configuration details
 
 ---
 
-**Version**: 0.1.0-beta
-**Last Updated**: 2026-03-18
+**Version**: 1.0.0
+**Last Updated**: 2026-06-16

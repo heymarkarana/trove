@@ -114,6 +114,47 @@ trove_is_sudo() {
     [[ -n "$SUDO_USER" ]]
 }
 
+# Get the owning username of a path (portable: macOS + Linux)
+# Usage: owner=$(trove_stat_owner "/path")
+# Returns: username on stdout + 0; empty + 1 if the path can't be stat'd
+# NOTE: the local is `target`, not `path` — `path` is zsh's special array tied
+# to $PATH; shadowing it would break command lookup inside the function.
+trove_stat_owner() {
+    local target="$1"
+    [[ -e "$target" ]] || return 1
+    if [[ "$OSTYPE" == darwin* ]]; then
+        stat -f '%Su' "$target" 2>/dev/null
+    else
+        stat -c '%U' "$target" 2>/dev/null
+    fi
+}
+
+# Get the octal permission bits of a path (portable: macOS + Linux)
+# Usage: mode=$(trove_stat_mode "/path")    # e.g. "644", "2755"
+# Returns: octal mode on stdout + 0; empty + 1 if the path can't be stat'd
+trove_stat_mode() {
+    local target="$1"
+    [[ -e "$target" ]] || return 1
+    if [[ "$OSTYPE" == darwin* ]]; then
+        stat -f '%Lp' "$target" 2>/dev/null
+    else
+        stat -c '%a' "$target" 2>/dev/null
+    fi
+}
+
+# Get the owning group of a path (portable: macOS + Linux)
+# Usage: group=$(trove_stat_group "/path")
+# Returns: group name on stdout + 0; empty + 1 if the path can't be stat'd
+trove_stat_group() {
+    local target="$1"
+    [[ -e "$target" ]] || return 1
+    if [[ "$OSTYPE" == darwin* ]]; then
+        stat -f '%Sg' "$target" 2>/dev/null
+    else
+        stat -c '%G' "$target" 2>/dev/null
+    fi
+}
+
 ###############################################################################
 # Platform Detection
 ###############################################################################
@@ -356,6 +397,7 @@ trove_helpers_help() {
     echo "Permission Checking:"
     echo "  trove_is_readable, trove_is_writable, trove_is_executable"
     echo "  trove_is_root, trove_is_sudo"
+    echo "  trove_stat_owner, trove_stat_group, trove_stat_mode (portable stat)"
     echo ""
     echo "Platform Detection:"
     echo "  trove_get_platform, trove_is_macos, trove_is_linux, trove_is_ubuntu"

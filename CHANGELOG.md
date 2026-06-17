@@ -5,6 +5,45 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-06-16
+
+### Added
+- **Atlas discovery** (`lib/trove_atlas.zsh`) — the keystone discovery reader:
+  `trove_atlas_get/require/tool/set/unset/dump/sync`. Registry at
+  `/opt/.atlas/registry` (override `ATLAS_REGISTRY`), parsed as data, resolution
+  order env → registry → default, fail-loud for instance facts. Auto-loaded by
+  the core. Contains zero consumer-namespace (`DF_*`/`BESKAR_*`) references.
+- **`bin/atlas-env`** — emits neutral `ATLAS_*` export lines for cron/system
+  contexts with no `$HOME`; consumable from bash/sh.
+- **`trove_error`** — convenience wrapper for `trove_log ERROR`.
+- **Portable stat helpers** — `trove_stat_owner`, `trove_stat_group`,
+  `trove_stat_mode` (octal), working on macOS + Linux.
+- **`trove_set_logging_enabled`** + `TROVE_ENABLE_LOGGING` honored from the
+  environment — a real "logging off" state that silences all output functions.
+- New test suites `tests/test_atlas.zunit`, `tests/test_atlas_env.zunit`, plus
+  Atlas/stat/logging/color coverage in the existing suites.
+- `LICENSE` (MIT).
+
+### Changed
+- **`trove_silent_run` no longer uses `eval`** — the command string is tokenized
+  with `${(Q)${(z)...}}` and executed directly, removing the shell-injection
+  surface (embedded command substitution is passed as literal arguments).
+- **All five colorschemes export every `COL_*` with `typeset -g`** (previously
+  only Monokai did, so the other schemes could be shadowed by a caller's local).
+- **Installer slimmed to Trove only** — removed machine provisioning (Xcode,
+  Homebrew, default-shell `chsh`, SSH keys, 1Password, Python venv) and the
+  legacy `kapps` registry. It still ensures Trove's one runtime dependency
+  (**zsh**) is installed — a zsh library needs zsh — but nothing else. The
+  installer is bash-shebanged so it runs on a box without zsh yet.
+- Tests are path-agnostic (honor `TROVE_HOME`); the runner targets the checkout.
+- Documentation: `klog`/`kreq`/`atlas-env` documented honestly as zsh scripts
+  (not compiled binaries); version strings reconciled; identity references and
+  the proprietary license removed in favor of MIT.
+
+### Fixed
+- `local path=` footgun in the stat helpers (would shadow zsh's special `path`
+  array and break command lookup) — renamed to `target`.
+
 ## [0.1.5-beta] - 2026-06-06
 
 ### Added

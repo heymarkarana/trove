@@ -1,646 +1,169 @@
-#!/bin/bash
-# Trove Installer
-# Sets up Trove utilities for system-wide use
+#!/usr/bin/env bash
+# Trove Installer.
+#
+# Trove is a zsh utility library plus three CLI facades (klog, kreq, atlas-env).
+# This installer is bash-shebanged so it can run on a fresh box that does not yet
+# have zsh — it ensures Trove's ONE runtime dependency (zsh) is present, then
+# validates the tree, sets permissions, and makes the CLIs reachable.
+#
+# It does NOT provision the machine beyond that single dependency: no Homebrew,
+# Xcode, SSH keys, 1Password, Python venvs, default-shell (`chsh`) changes, or
+# Atlas-registry seeding. Those belong to bootstrap/dotFiles. (Installing zsh is
+# Trove's own runtime dependency, not machine provisioning — a zsh library has
+# to have zsh to load.)
 
 set -e
 
-TROVE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION="$(cat "${INSTALL_DIR}/VERSION" 2>/dev/null || echo unknown)"
+
+# Minimal bash logging for the installer's own output (the zsh logging library
+# can't be sourced from bash before zsh is guaranteed present).
+_bot()     { printf '\n  ✪ %s\n' "$1"; }
+_running() { printf '   ✨ %s\n' "$1"; }
+_ok()      { printf '   ✔ %s\n' "$1"; }
+_warn()    { printf '   ⚠ %s\n' "$1" >&2; }
+_err()     { printf '   ✖ %s\n' "$1" >&2; }
 
 echo ""
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║              Trove - Shared Utilities Library             ║"
-echo "║                      v0.1.0-beta                           ║"
+echo "║              Trove — Shared Utilities Library              ║"
+printf  "║                        v%-36s║\n" "${VERSION}"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
-
-# Determine installation directory
-INSTALL_DIR="${TROVE_ROOT}"
 echo "Installing from: ${INSTALL_DIR}"
-echo ""
 
-# Source logging to provide nice output
-if [[ -f "${INSTALL_DIR}/lib/trove_logging.zsh" ]]; then
-    source "${INSTALL_DIR}/lib/trove_logging.zsh"
+###############################################################################
+# Prerequisite: zsh (Trove's own runtime dependency — nothing else)
+###############################################################################
+
+_bot "Checking prerequisite: zsh"
+
+if command -v zsh >/dev/null 2>&1; then
+    _ok "zsh present: $(command -v zsh)"
 else
-    # Fallback: minimal logging
-    trove_log() { echo "[${1}] ${2}" >&2; }
-    trove_bot() { echo ""; echo "✪ ${1}" >&2; }
-    trove_running() { echo "  ✨ ${1}" >&2; }
-    trove_ok() { echo "  ✔ ${1}" >&2; }
-fi
-
-###############################################################################
-# Prerequisites
-###############################################################################
-
-trove_bot "Checking Prerequisites"
-
-PLATFORM="$(uname -s)"
-
-# --- Xcode Command Line Tools (macOS only) ---
-if [[ "$PLATFORM" == "Darwin" ]]; then
-    trove_running "Checking for Xcode Command Line Tools"
-    if ! xcode-select -p &>/dev/null; then
-        trove_log INFO "Xcode Command Line Tools not found — installing"
-        xcode-select --install
-        trove_log INFO "Waiting for installation to complete..."
-        until xcode-select -p &>/dev/null; do
-            sleep 5
-        done
-        trove_ok "Xcode Command Line Tools installed"
-    else
-        trove_ok "Xcode Command Line Tools: $(xcode-select -p)"
-    fi
-fi
-
-# --- Homebrew ---
-trove_running "Checking for Homebrew"
-if ! command -v brew >/dev/null 2>&1; then
-    trove_log INFO "Homebrew not found — installing now"
-
+    _warn "zsh not found — Trove is a zsh library and requires it."
+    PLATFORM="$(uname -s)"
     if [[ "$PLATFORM" == "Darwin" ]]; then
-        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        # Bring brew into the current session (Apple Silicon or Intel)
-        if [[ -f "/opt/homebrew/bin/brew" ]]; then
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-        elif [[ -f "/usr/local/bin/brew" ]]; then
-            eval "$(/usr/local/bin/brew shellenv)"
+        # zsh ships with macOS 10.15+; only an unusual setup reaches here.
+        if command -v brew >/dev/null 2>&1; then
+            _running "Installing zsh via Homebrew"
+            brew install zsh
+        else
+            _err "Install zsh and re-run (macOS 10.15+ ships zsh by default)."
+            exit 1
         fi
-
-    elif [[ "$PLATFORM" == "Linux" ]]; then
-        trove_running "Installing Homebrew build dependencies"
-        sudo apt-get update -q && sudo apt-get install -y build-essential procps curl file git
-        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        if [[ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
-            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-        fi
-
+    elif [[ "$PLATFORM" == "Linux" ]] && command -v apt-get >/dev/null 2>&1; then
+        _running "Installing zsh via apt-get"
+        sudo apt-get update -q && sudo apt-get install -y zsh
+    elif command -v dnf >/dev/null 2>&1; then
+        _running "Installing zsh via dnf"
+        sudo dnf install -y zsh
     else
-        trove_log WARN "Unsupported platform '${PLATFORM}' — skipping Homebrew install"
-    fi
-
-    if command -v brew >/dev/null 2>&1; then
-        trove_ok "Homebrew installed: $(brew --version | head -1)"
-        # Persist shellenv to ~/.zshrc so brew is available in future sessions
-        if [[ -f "${HOME}/.zshrc" ]] && ! grep -q "brew shellenv" "${HOME}/.zshrc"; then
-            echo "" >> "${HOME}/.zshrc"
-            echo "# Homebrew" >> "${HOME}/.zshrc"
-            echo 'eval "$(brew shellenv)"' >> "${HOME}/.zshrc"
-            trove_ok "Added brew shellenv to ~/.zshrc"
-        fi
-    else
-        trove_log WARN "Homebrew install may have failed — some features may not be available"
-    fi
-else
-    trove_ok "Homebrew found: $(brew --version | head -1)"
-fi
-
-###############################################################################
-# Validation
-###############################################################################
-
-trove_bot "Validating Installation"
-
-# Ensure ZSH is installed
-trove_running "Checking for ZSH"
-if ! command -v zsh >/dev/null 2>&1; then
-    trove_log INFO "ZSH not found — installing"
-    if [[ "$PLATFORM" == "Darwin" ]]; then
-        brew install zsh
-    elif [[ "$PLATFORM" == "Linux" ]]; then
-        sudo apt-get install -y zsh
-    fi
-fi
-touch "${HOME}/.zshrc"
-trove_ok "ZSH ready: $(command -v zsh)"
-
-# Offer to switch default shell to ZSH
-if [[ "$(basename "$SHELL")" != "zsh" ]] && [[ -t 0 ]]; then
-    printf "  Switch default shell to ZSH? [Y/n]: "
-    read -r _zsh_switch
-    if [[ ! "$_zsh_switch" =~ ^[Nn]$ ]]; then
-        chsh -s "$(command -v zsh)"
-        trove_ok "Default shell set to ZSH (restart terminal to take effect)"
-    fi
-fi
-
-# Check directory structure
-trove_running "Checking directory structure"
-required_dirs=("bin" "lib" "config" "tests" "docs")
-for dir in "${required_dirs[@]}"; do
-    if [[ ! -d "${INSTALL_DIR}/${dir}" ]]; then
-        trove_log ERROR "Missing directory: ${dir}"
+        _err "Could not auto-install zsh on this platform. Install it and re-run."
         exit 1
     fi
-done
-trove_ok "Directory structure valid"
+    command -v zsh >/dev/null 2>&1 || { _err "zsh still not available after install."; exit 1; }
+    _ok "zsh installed: $(command -v zsh)"
+fi
 
-# Check required files
-trove_running "Checking required files"
+# NOTE: we intentionally do NOT change the default shell (chsh). That is a user
+# / dotFiles decision, not Trove's.
+
+###############################################################################
+# Validate the tree
+###############################################################################
+
+_bot "Validating Trove tree"
+
+for dir in bin lib; do
+    [[ -d "${INSTALL_DIR}/${dir}" ]] || { _err "Missing directory: ${dir}"; exit 1; }
+done
+_ok "Directory structure valid"
+
 required_files=(
     "lib/trove_logging.zsh"
     "lib/trove_colors.zsh"
     "lib/trove_helpers.zsh"
-    "lib/trove_monitoring.zsh"
-    "lib/trove_date.zsh"
+    "lib/trove_atlas.zsh"
+    "lib/trove_init.zsh"
     "bin/klog"
-    "config/trove.conf"
+    "bin/kreq"
+    "bin/atlas-env"
     "VERSION"
 )
 for file in "${required_files[@]}"; do
-    if [[ ! -f "${INSTALL_DIR}/${file}" ]]; then
-        trove_log ERROR "Missing file: ${file}"
-        exit 1
-    fi
+    [[ -f "${INSTALL_DIR}/${file}" ]] || { _err "Missing file: ${file}"; exit 1; }
 done
-trove_ok "Required files present"
-
-###############################################################################
-# SSH Key Setup
-###############################################################################
-
-trove_bot "SSH Key Setup"
-
-mkdir -p "${HOME}/.ssh"
-chmod 700 "${HOME}/.ssh"
-
-if [[ ! -f "${HOME}/.ssh/id_ed25519" ]]; then
-    trove_running "Generating SSH key (ed25519)"
-    ssh-keygen -t ed25519 -a 100 -f "${HOME}/.ssh/id_ed25519" -q -N ""
-    trove_ok "SSH key generated at ~/.ssh/id_ed25519"
-else
-    trove_ok "SSH key already exists at ~/.ssh/id_ed25519"
-fi
-
-echo ""
-trove_log INFO "Your public SSH key:"
-echo "────────────────────────────────────────────────────────────"
-cat "${HOME}/.ssh/id_ed25519.pub"
-echo "────────────────────────────────────────────────────────────"
-echo ""
-
-# Copy to clipboard
-if [[ "$PLATFORM" == "Darwin" ]]; then
-    pbcopy < "${HOME}/.ssh/id_ed25519.pub"
-    trove_ok "Key copied to clipboard"
-elif command -v xclip &>/dev/null; then
-    xclip -selection clipboard < "${HOME}/.ssh/id_ed25519.pub"
-    trove_ok "Key copied to clipboard"
-else
-    trove_log INFO "Install xclip for clipboard support: sudo apt install xclip"
-fi
-
-# Offer to open git service to add the key
-if [[ -t 0 ]]; then
-    echo ""
-    echo "  Add this key to your Git service:"
-    echo "    1) GitHub  — https://github.com/settings/keys"
-    echo "    2) GitLab  — https://gitlab.com/profile/keys"
-    echo "    3) Other   — enter URL manually"
-    echo "    4) Skip"
-    echo ""
-    printf "  Choice (1/2/3/4): "
-    read -r _ssh_choice
-
-    _ssh_url=""
-    case "$_ssh_choice" in
-        1) _ssh_url="https://github.com/settings/keys" ;;
-        2) _ssh_url="https://gitlab.com/profile/keys" ;;
-        3) printf "  URL: "; read -r _ssh_url ;;
-    esac
-
-    if [[ -n "$_ssh_url" ]]; then
-        if [[ "$PLATFORM" == "Darwin" ]]; then
-            open "$_ssh_url" 2>/dev/null || trove_log INFO "Visit: $_ssh_url"
-        else
-            xdg-open "$_ssh_url" 2>/dev/null || trove_log INFO "Visit: $_ssh_url"
-        fi
-        echo ""
-        printf "  Press Enter once you've added the key... "
-        read -r
-    fi
-fi
-
-###############################################################################
-# 1Password CLI
-###############################################################################
-
-trove_bot "1Password CLI"
-
-if command -v op &>/dev/null; then
-    trove_ok "1Password CLI already installed"
-else
-    echo ""
-    trove_log INFO "1Password CLI provides secure secret management:"
-    echo "    • API keys, SSH keys with biometric unlock, git-crypt keys"
-    echo ""
-    printf "  Install 1Password CLI? [Y/n]: "
-    read -r _op_install
-
-    if [[ ! "$_op_install" =~ ^[Nn]$ ]]; then
-        if [[ "$PLATFORM" == "Darwin" ]]; then
-            brew install --cask 1password-cli && trove_ok "1Password CLI installed"
-
-        elif [[ "$PLATFORM" == "Linux" ]]; then
-            trove_running "Adding 1Password APT repository"
-            curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-                sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
-
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-                sudo tee /etc/apt/sources.list.d/1password.list > /dev/null
-
-            sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/
-            curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | \
-                sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol > /dev/null
-            sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22
-            curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-                sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
-
-            sudo apt-get update -q && sudo apt-get install -y 1password-cli
-            trove_ok "1Password CLI installed"
-        fi
-    else
-        trove_log INFO "Skipping 1Password CLI — secrets will require manual entry"
-    fi
-fi
-
-# Authenticate if installed and not already signed in
-if command -v op &>/dev/null && ! op account list &>/dev/null 2>&1; then
-    echo ""
-    printf "  Add a 1Password account now? [Y/n]: "
-    read -r _op_auth
-    if [[ ! "$_op_auth" =~ ^[Nn]$ ]]; then
-        op account add && trove_ok "1Password account added" || \
-            trove_log WARN "Authentication skipped — run 'op account add' later"
-    fi
-fi
+_ok "Required files present"
 
 ###############################################################################
 # Permissions
 ###############################################################################
 
-trove_bot "Setting Permissions"
+_bot "Setting permissions"
 
-# Make klog executable
-if [[ -f "${INSTALL_DIR}/bin/klog" ]]; then
-    trove_running "Making klog executable"
-    chmod +x "${INSTALL_DIR}/bin/klog"
-    trove_ok "klog is executable"
-fi
+chmod +x "${INSTALL_DIR}"/bin/klog "${INSTALL_DIR}"/bin/kreq "${INSTALL_DIR}"/bin/atlas-env
+_ok "klog, kreq, atlas-env are executable"
 
-# Make libraries readable
-trove_running "Setting library permissions"
 chmod 644 "${INSTALL_DIR}"/lib/*.zsh
-trove_ok "Library permissions set"
+_ok "Library files set to 644"
 
 ###############################################################################
-# Testing
+# Smoke test (runs under zsh, which is now guaranteed present)
 ###############################################################################
 
-trove_bot "Testing Installation"
+_bot "Verifying installation"
 
-# Test sourcing logging
-trove_running "Testing logging library"
-if source "${INSTALL_DIR}/lib/trove_logging.zsh" 2>/dev/null; then
-    trove_ok "Logging library loads successfully"
+if zsh -c "source '${INSTALL_DIR}/lib/trove_init.zsh' 2>/dev/null; (( \${+functions[trove_atlas_get]} ))"; then
+    _ok "Core loads; Atlas reader present"
 else
-    trove_log ERROR "Failed to load logging library"
+    _err "Trove core failed to load under zsh"
     exit 1
 fi
 
-# Test klog binary
-trove_running "Testing klog binary"
 if "${INSTALL_DIR}/bin/klog" --help >/dev/null 2>&1; then
-    trove_ok "klog binary works"
+    _ok "klog facade works"
 else
-    trove_log ERROR "klog binary failed"
-    exit 1
-fi
-
-# Test color schemes
-trove_running "Testing color schemes"
-if source "${INSTALL_DIR}/lib/trove_colors.zsh" 2>/dev/null; then
-    trove_ok "Color schemes load successfully"
-else
-    trove_log ERROR "Failed to load color schemes"
+    _err "klog failed"
     exit 1
 fi
 
 ###############################################################################
-# Central Registry Setup
+# Make the CLIs reachable
 ###############################################################################
 
-trove_bot "Central Application Registry"
+_bot "Making the CLIs reachable"
 
-# Create registry infrastructure if it doesn't exist
-KAPPS_DIR="/opt/.config/kapps"
-KAPPS_REGISTRY="${KAPPS_DIR}/registry.txt"
-KAPPS_LOCATIONS="${KAPPS_DIR}/locations.zsh"
-
-if [[ ! -d "$KAPPS_DIR" ]]; then
-    trove_running "Creating registry directory: ${KAPPS_DIR}"
-
-    # Create directory
-    if sudo mkdir -p "$KAPPS_DIR" 2>/dev/null; then
-        # Check for kgroup and set ownership
-        if getent group kgroup &>/dev/null || dscl . -read /Groups/kgroup &>/dev/null 2>&1; then
-            trove_running "Setting ownership to root:kgroup (shared access)"
-            sudo chown root:kgroup "$KAPPS_DIR"
-            sudo chmod 2775 "$KAPPS_DIR"  # rwxrwsr-x with setgid
-        else
-            sudo chown root:wheel "$KAPPS_DIR"
-            sudo chmod 755 "$KAPPS_DIR"
-        fi
-        trove_ok "Registry directory created"
-    else
-        trove_log WARN "Could not create ${KAPPS_DIR} - skipping registry setup"
+LINK_DIR=""
+for candidate in /usr/local/bin "${HOME}/.local/bin"; do
+    if [[ -d "$candidate" && -w "$candidate" ]]; then
+        LINK_DIR="$candidate"
+        break
     fi
-fi
+done
 
-# Install locations.zsh library if it doesn't exist
-if [[ ! -f "$KAPPS_LOCATIONS" ]]; then
-    trove_running "Installing registry library"
-
-    # Download or copy locations.zsh
-    # For now, we'll create it inline
-    sudo tee "$KAPPS_LOCATIONS" > /dev/null << 'REGISTRY_EOF'
-#!/usr/bin/env zsh
-# ══════════════════════════════════════════════════════════════════════════════
-# Central Application Registry for /opt installations
-# ══════════════════════════════════════════════════════════════════════════════
-# Location: /opt/.config/kapps/locations.zsh
-# Created by: Trove installer
-# ══════════════════════════════════════════════════════════════════════════════
-
-KAPPS_REGISTRY_FILE="/opt/.config/kapps/registry.txt"
-KAPPS_REGISTRY_LOCK="/opt/.config/kapps/.registry.lock"
-
-kapps_register() {
-    local app_name="$1"
-    local user="$2"
-    local install_path="$3"
-
-    [[ -z "$app_name" || -z "$user" || -z "$install_path" ]] && {
-        echo "Usage: kapps_register <app_name> <user> <install_path>" >&2
-        return 1
-    }
-
-    [[ ! -e "$install_path" ]] && {
-        echo "Error: Install path does not exist: $install_path" >&2
-        return 1
-    }
-
-    if [[ ! -f "$KAPPS_REGISTRY_FILE" ]]; then
-        sudo mkdir -p "$(dirname "$KAPPS_REGISTRY_FILE")" 2>/dev/null
-        sudo touch "$KAPPS_REGISTRY_FILE" 2>/dev/null
-        sudo chmod 664 "$KAPPS_REGISTRY_FILE" 2>/dev/null
-    fi
-
-    local entry="${app_name}:${user}:${install_path}"
-    local lock_fd
-
-    if command -v flock &>/dev/null; then
-        exec {lock_fd}>"$KAPPS_REGISTRY_LOCK"
-        flock -x "$lock_fd" 2>/dev/null
-    fi
-
-    if [[ -f "$KAPPS_REGISTRY_FILE" ]]; then
-        local temp_file=$(mktemp)
-        grep -v "^${app_name}:${user}:" "$KAPPS_REGISTRY_FILE" > "$temp_file" 2>/dev/null || true
-        sudo mv "$temp_file" "$KAPPS_REGISTRY_FILE"
-    fi
-
-    echo "$entry" | sudo tee -a "$KAPPS_REGISTRY_FILE" >/dev/null
-    [[ -n "$lock_fd" ]] && exec {lock_fd}>&-
-
-    return 0
-}
-
-kapps_lookup() {
-    local app_name="$1"
-    local user="${2:-$(whoami)}"
-
-    [[ -z "$app_name" ]] && {
-        echo "Usage: kapps_lookup <app_name> [user]" >&2
-        return 1
-    }
-
-    [[ ! -f "$KAPPS_REGISTRY_FILE" ]] && return 1
-
-    local result=$(grep "^${app_name}:${user}:" "$KAPPS_REGISTRY_FILE" 2>/dev/null | head -n1 | cut -d: -f3)
-
-    if [[ -z "$result" && "$user" != "root" ]]; then
-        result=$(grep "^${app_name}:root:" "$KAPPS_REGISTRY_FILE" 2>/dev/null | head -n1 | cut -d: -f3)
-    fi
-
-    [[ -n "$result" ]] && echo "$result" && return 0
-    return 1
-}
-
-kapps_list() {
-    local app_name="$1"
-
-    [[ ! -f "$KAPPS_REGISTRY_FILE" ]] && {
-        echo "No applications registered" >&2
-        return 1
-    }
-
-    if [[ -n "$app_name" ]]; then
-        grep "^${app_name}:" "$KAPPS_REGISTRY_FILE" 2>/dev/null || {
-            echo "No registrations found for: $app_name" >&2
-            return 1
-        }
-    else
-        cat "$KAPPS_REGISTRY_FILE"
-    fi
-}
-
-kapps_remove() {
-    local app_name="$1"
-    local user="${2:-$(whoami)}"
-
-    [[ -z "$app_name" ]] && {
-        echo "Usage: kapps_remove <app_name> [user]" >&2
-        return 1
-    }
-
-    [[ ! -f "$KAPPS_REGISTRY_FILE" ]] && return 0
-
-    local temp_file=$(mktemp)
-    grep -v "^${app_name}:${user}:" "$KAPPS_REGISTRY_FILE" > "$temp_file" 2>/dev/null || true
-    sudo mv "$temp_file" "$KAPPS_REGISTRY_FILE"
-
-    return 0
-}
-
-kapps_verify() {
-    local app_name="$1"
-    local user="${2:-$(whoami)}"
-
-    local install_path=$(kapps_lookup "$app_name" "$user")
-    [[ -z "$install_path" ]] && return 1
-
-    [[ -e "$install_path" ]] && return 0
-    return 1
-}
-
-kapps_has_kgroup() {
-    getent group kgroup &>/dev/null || dscl . -read /Groups/kgroup &>/dev/null 2>&1
-}
-
-kapps_recommended_ownership() {
-    if kapps_has_kgroup; then
-        echo "root:kgroup"
-    else
-        echo "root:wheel"
-    fi
-}
-
-kapps_mkdir() {
-    local path="$1"
-    [[ -z "$path" ]] && return 1
-
-    sudo mkdir -p "$path" || return 1
-
-    local ownership=$(kapps_recommended_ownership)
-    sudo chown "$ownership" "$path"
-    sudo chmod 2775 "$path"
-
-    return 0
-}
-REGISTRY_EOF
-
-    sudo chmod 664 "$KAPPS_LOCATIONS"
-    trove_ok "Registry library installed"
-else
-    trove_ok "Registry library already exists"
-fi
-
-###############################################################################
-# PATH Setup
-###############################################################################
-
-trove_bot "PATH Configuration"
-
-# Check if already in PATH
-if [[ ":$PATH:" == *":${INSTALL_DIR}/bin:"* ]]; then
-    trove_ok "Trove is already in your PATH"
+if [[ -n "$LINK_DIR" ]]; then
+    for cli in klog kreq atlas-env; do
+        ln -sf "${INSTALL_DIR}/bin/${cli}" "${LINK_DIR}/${cli}"
+    done
+    _ok "Symlinked klog, kreq, atlas-env into ${LINK_DIR}"
 else
     echo ""
-    trove_log INFO "To add Trove to your PATH, add this to your ~/.zshrc:"
-    echo ""
-    echo "  export PATH=\"${INSTALL_DIR}/bin:\$PATH\""
-    echo ""
-
-    # Offer to add to .zshrc
-    if [[ -t 0 ]]; then  # Only if interactive
-        printf "Add to ~/.zshrc now? [y/N]: "
-        read -r response
-
-        if [[ "$response" =~ ^[Yy]$ ]]; then
-            echo "" >> "${HOME}/.zshrc"
-            echo "# Trove - Shared Utilities Library" >> "${HOME}/.zshrc"
-            echo "export PATH=\"${INSTALL_DIR}/bin:\$PATH\"" >> "${HOME}/.zshrc"
-            trove_ok "Added to ~/.zshrc - restart your shell or run: source ~/.zshrc"
-        fi
-    fi
+    echo "  No writable standard bin dir found. Add Trove to your PATH:"
+    echo "    export PATH=\"${INSTALL_DIR}/bin:\$PATH\""
 fi
 
 ###############################################################################
-# Registry Registration
-###############################################################################
-
-trove_bot "Registry Registration"
-
-# Register in central kapps registry
-if [[ -f "/opt/.config/kapps/locations.zsh" ]]; then
-    source "/opt/.config/kapps/locations.zsh"
-
-    # Determine ownership
-    INSTALL_USER="$(stat -f '%Su' "$INSTALL_DIR" 2>/dev/null || stat -c '%U' "$INSTALL_DIR" 2>/dev/null)"
-    [[ -z "$INSTALL_USER" ]] && INSTALL_USER="$(whoami)"
-
-    if kapps_register "trove" "$INSTALL_USER" "$INSTALL_DIR"; then
-        trove_ok "Registered in /opt/.config/kapps/registry.txt"
-
-        # Suggest kgroup ownership for shared installations
-        if kapps_has_kgroup && [[ "$INSTALL_DIR" == /opt/* ]]; then
-            CURRENT_GROUP="$(stat -f '%Sg' "$INSTALL_DIR" 2>/dev/null || stat -c '%G' "$INSTALL_DIR" 2>/dev/null)"
-            if [[ "$CURRENT_GROUP" != "kgroup" ]]; then
-                echo ""
-                trove_log INFO "💡 Tip: For shared access, set ownership to kgroup:"
-                echo "   sudo chown -R ${INSTALL_USER}:kgroup ${INSTALL_DIR}"
-                echo "   sudo chmod -R g+w ${INSTALL_DIR}"
-            fi
-        fi
-    fi
-else
-    trove_log INFO "Central registry not found - skipping registration"
-    trove_log INFO "Create registry: sudo mkdir -p /opt/.config/kapps"
-fi
-
-###############################################################################
-# Python Virtual Environment
-###############################################################################
-
-trove_bot "Python Virtual Environment"
-
-VENV_PATH="/opt/kuzcotopia/.venv"
-
-if [[ -f "${VENV_PATH}/bin/python3" ]]; then
-    trove_ok "Python venv already exists at ${VENV_PATH}"
-else
-    trove_running "Checking for python3"
-    if ! command -v python3 >/dev/null 2>&1; then
-        trove_log WARN "python3 not found — skipping venv creation"
-        trove_log WARN "Install Python3 and re-run: brew install python  OR  sudo apt-get install python3 python3-venv"
-    else
-        trove_running "Creating shared Python venv at ${VENV_PATH}"
-        VENV_PARENT="$(dirname "${VENV_PATH}")"
-        if [[ ! -d "${VENV_PARENT}" ]]; then
-            sudo mkdir -p "${VENV_PARENT}"
-            if getent group kgroup &>/dev/null || dscl . -read /Groups/kgroup &>/dev/null 2>&1; then
-                sudo chown "$(whoami):kgroup" "${VENV_PARENT}"
-                sudo chmod 2775 "${VENV_PARENT}"
-            fi
-        fi
-
-        if python3 -m venv "${VENV_PATH}"; then
-            trove_ok "Python venv created: ${VENV_PATH}"
-            trove_ok "Python: $(${VENV_PATH}/bin/python3 --version)"
-        else
-            trove_log WARN "Failed to create venv — Python scripts may not work correctly"
-        fi
-    fi
-fi
-
-###############################################################################
-# Success
+# Done
 ###############################################################################
 
 echo ""
-trove_log INFO "✅ Trove installation complete!"
+echo "  ✅ Trove ${VERSION} installed."
 echo ""
-echo "Functions are immediately available (no shell restart needed):"
+echo "  Source the core in your shell (or via your dotfiles):"
+echo "    source \"${INSTALL_DIR}/lib/trove_init.zsh\""
 echo ""
-echo "Core functions (auto-loaded):"
-echo "  trove_log INFO \"test\"               # Logging"
-echo "  trove_bot \"Major Task\"              # Task headers"
-echo "  trove_running \"Configuring...\"      # Status messages"
-echo "  trove_ok \"Success\"                  # Success confirmations"
-echo ""
-echo "Optional libraries (load on-demand):"
-echo "  trove_load helpers                   # Path/system utilities"
-echo "  trove_load date                      # Date/time functions"
-echo "  trove_load monitoring                # System metrics"
-echo ""
-echo "CLI available:"
-echo "  klog INFO \"message\"                 # From compiled apps"
-echo "  klog --help                          # Show help"
-echo ""
-echo "Documentation:"
-echo "  ${INSTALL_DIR}/README.md                         # Overview"
-echo "  ${INSTALL_DIR}/docs/API.md                       # API reference"
-echo ""
-echo "Version: $(cat ${INSTALL_DIR}/VERSION)"
+echo "  CLIs:  klog INFO \"message\"  ·  kreq check zsh  ·  atlas-env"
+echo "  Docs:  ${INSTALL_DIR}/README.md · ${INSTALL_DIR}/docs/API.md"
 echo ""
