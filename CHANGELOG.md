@@ -5,6 +5,17 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-06-18
+
+### Fixed
+- **`trove_stat_mode` now reports the setuid/setgid/sticky bits** on macOS/BSD.
+  The `%Lp` stat format dropped the high bits, so a setgid `2755` dir read back
+  as `755` — breaking the helper's own documented contract (`# e.g. "2755"`) and
+  making setgid invariants uncheckable by consumers (dotFiles `df_perms`). It now
+  reads the full mode (`%p`), masks `& 07777`, and emits it normalized like GNU
+  `%a`, so both platforms return identical strings including the special bits.
+  Surfaced by dotFiles WS3 (Wave-0b `df_perms`).
+
 ## [1.0.0] - 2026-06-16
 
 ### Added

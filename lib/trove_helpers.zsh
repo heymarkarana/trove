@@ -132,11 +132,17 @@ trove_stat_owner() {
 # Get the octal permission bits of a path (portable: macOS + Linux)
 # Usage: mode=$(trove_stat_mode "/path")    # e.g. "644", "2755"
 # Returns: octal mode on stdout + 0; empty + 1 if the path can't be stat'd
+# Includes the setuid/setgid/sticky bits (e.g. a setgid dir -> "2755"). On BSD
+# `%Lp` reports only the low 9 permission bits, so we read the full mode (`%p`),
+# mask off the file-type bits (07777), and emit it normalized like GNU `%a`
+# (no leading zero) so both platforms return identical strings.
 trove_stat_mode() {
     local target="$1"
     [[ -e "$target" ]] || return 1
     if [[ "$OSTYPE" == darwin* ]]; then
-        stat -f '%Lp' "$target" 2>/dev/null
+        local full
+        full="$(stat -f '%p' "$target" 2>/dev/null)" || return 1
+        printf '%o\n' "$(( 8#${full} & 8#7777 ))"
     else
         stat -c '%a' "$target" 2>/dev/null
     fi
