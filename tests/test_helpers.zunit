@@ -287,6 +287,29 @@
   assert "$output" same_as '600'
 }
 
+@test 'trove_stat_mode reports the sticky special bit (OI-3 high-bit regression)' {
+  # The setgid invariant (conventions §6) needs the HIGH bits preserved — the BSD
+  # %Lp bug this helper works around dropped them. Sticky (1000) is a high bit that
+  # reliably sticks even on macOS /tmp (unlike setgid, which /tmp strips), so it's
+  # the deterministic regression for "high bits are not dropped".
+  mkdir -p "${TROVE_TEST_DIR}/sticky"
+  chmod 1777 "${TROVE_TEST_DIR}/sticky"
+  run trove_stat_mode "${TROVE_TEST_DIR}/sticky"
+  assert "$output" same_as '1777'
+}
+
+@test 'trove_stat_mode reports the setgid special bit when the FS keeps it' {
+  mkdir -p "${TROVE_TEST_DIR}/sgid"
+  chmod 2755 "${TROVE_TEST_DIR}/sgid"
+  # Some sandboxed filesystems (macOS /tmp) strip setgid on chmod; only assert
+  # when it actually stuck (-g tests the setgid bit) — the sticky test covers the
+  # high-bit path regardless.
+  if [[ -g "${TROVE_TEST_DIR}/sgid" ]]; then
+    run trove_stat_mode "${TROVE_TEST_DIR}/sgid"
+    assert "$output" same_as '2755'
+  fi
+}
+
 @test 'trove_stat_group returns the owning group' {
   touch "${TROVE_TEST_DIR}/groupfile"
   run trove_stat_group "${TROVE_TEST_DIR}/groupfile"
