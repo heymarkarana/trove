@@ -5,6 +5,13 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-06-21
+
+### Changed
+- **Identity scrub of historical CHANGELOG entries** — de-identified the remaining
+  instance literals in older release notes (replaced with generic placeholders).
+  No code change; the whole tracked tree is now free of homelab identity.
+
 ## [1.0.2] - 2026-06-20
 
 ### Added
@@ -54,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only Monokai did, so the other schemes could be shadowed by a caller's local).
 - **Installer slimmed to Trove only** — removed machine provisioning (Xcode,
   Homebrew, default-shell `chsh`, SSH keys, 1Password, Python venv) and the
-  legacy `kapps` registry. It still ensures Trove's one runtime dependency
+  legacy central registry. It still ensures Trove's one runtime dependency
   (**zsh**) is installed — a zsh library needs zsh — but nothing else. The
   installer is bash-shebanged so it runs on a box without zsh yet.
 - Tests are path-agnostic (honor `TROVE_HOME`); the runner targets the checkout.
@@ -77,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.4-beta] - 2026-05-30
 
 ### Documentation
-- **AGENTS.md rewritten** — removed hardcoded `/opt/trove` paths (replaced with `$TROVE_PATH`), removed homelab-specific identity ("kuzcotopia ecosystem", "The Secret Lab"), updated version reference, removed emojis, added architecture rules section (no hardcoding, no homelab identity, graceful degradation), and restructured to match the dotFiles AGENTS.md style. Function reference tables and usage patterns retained.
+- **AGENTS.md rewritten** — removed hardcoded `/opt/trove` paths (replaced with `$TROVE_PATH`), removed homelab-specific identity ("<codename> ecosystem", "The Secret Lab"), updated version reference, removed emojis, added architecture rules section (no hardcoding, no homelab identity, graceful degradation), and restructured to match the dotFiles AGENTS.md style. Function reference tables and usage patterns retained.
 
 ## [0.1.3-beta] - 2026-04-25
 
@@ -98,15 +105,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Shared Python virtual environment setup during installation
-  - Creates `/opt/kuzcotopia/.venv` as the canonical Python runtime for all dotFiles ecosystem tooling
-  - Applies kgroup ownership when available
+  - Creates `/opt/<codename>/.venv` as the canonical Python runtime for all dotFiles ecosystem tooling
+  - Applies <group> ownership when available
   - Skips silently if venv already exists; warns (non-fatal) if python3 is not installed
 
 ## [0.1.1-beta] - 2026-03-22
 
 ### Added
-- Central application registry system (`/opt/.config/kapps/`)
-  - Creates registry directory with kgroup ownership detection
+- Central application registry system (`/opt/.config/registry/`)
+  - Creates registry directory with <group> ownership detection
   - Installs `locations.zsh` library with registry functions (register, lookup, list, remove, verify)
   - Automatically registers Trove during installation
   - Enables cross-tool discovery for dotFiles ecosystem
