@@ -155,6 +155,13 @@ else
 fi
 
 ###############################################################################
+# Prefer SSH origin (opportunistic — only if your key already authenticates)
+###############################################################################
+
+_bot "Git remote"
+zsh -c "source '${INSTALL_DIR}/lib/trove_init.zsh' 2>/dev/null; trove_load helpers 2>/dev/null; trove_git_prefer_ssh '${INSTALL_DIR}'" || true
+
+###############################################################################
 # Done
 ###############################################################################
 

@@ -5,6 +5,17 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-06-20
+
+### Added
+- **`spark.sh`** — a `curl … | bash` cold-start installer. Runs as the user
+  (escalates only system steps via `sudo`), clones Trove to `/opt/trove`, and runs
+  `./install`. Idempotent; refuses the placeholder `SPARK_REPO_BASE`.
+- **`trove_git_prefer_ssh <dir>`** (in `trove_helpers`) — opportunistically switch
+  a repo's `origin` from http(s):// to ssh:// once the SSH key authenticates;
+  leaves it on HTTP otherwise. Pure-zsh match (no `grep` dependency). Seams:
+  `TROVE_GIT_BIN`, `TROVE_SSH_BIN`. The installer calls it as a final step.
+
 ## [1.0.1] - 2026-06-18
 
 ### Fixed

@@ -428,6 +428,54 @@ trove_helpers_help() {
 }
 
 ###############################################################################
+# Git utilities
+###############################################################################
+
+# trove_git_prefer_ssh <repo-dir>
+# Opportunistically switch a repo's `origin` from http(s):// to ssh:// — but only
+# once the SSH key actually authenticates. Idempotent: an already-ssh origin is a
+# no-op; an http(s) origin whose key doesn't verify yet is LEFT on http (with an
+# info line) so a later run flips it. Seams: TROVE_GIT_BIN, TROVE_SSH_BIN.
+trove_git_prefer_ssh() {
+    emulate -L zsh
+    local dir="${1:-}"
+    [[ -n "$dir" ]] || { trove_log ERROR "trove_git_prefer_ssh: need a repo directory"; return 1; }
+    local git="${TROVE_GIT_BIN:-git}" ssh="${TROVE_SSH_BIN:-ssh}"
+    [[ -d "${dir}/.git" ]] || { trove_log WARN "trove_git_prefer_ssh: ${dir} is not a git repo"; return 0; }
+
+    local url; url="$("$git" -C "$dir" remote get-url origin 2>/dev/null)" || {
+        trove_log WARN "trove_git_prefer_ssh: ${dir} has no 'origin' remote"; return 0; }
+    case "$url" in
+        ssh://*|git@*)      trove_log INFO "git: ${dir:t} origin already SSH"; return 0 ;;
+        http://*|https://*) ;;
+        *)                  return 0 ;;   # unknown scheme — leave it alone
+    esac
+
+    # Derive ssh://git@<host>/<path> from http(s)://<host>[:port]/<path>.
+    # NB: avoid `path` — it's a zsh special var aliased to PATH (would corrupt it).
+    local rest="${url#http://}"; rest="${rest#https://}"
+    local host="${rest%%/*}"; local rpath="${rest#*/}"
+    host="${host%%:*}"
+    local ssh_url="ssh://git@${host}/${rpath}"
+
+    # Verify the key works before switching (BatchMode → never prompt). Forgejo/
+    # GitHub return non-zero even on success, so match the greeting, not the code.
+    # Pure-zsh match (no external grep): capture stderr+stdout and case-fold.
+    local probe; probe="$("$ssh" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T "git@${host}" 2>&1)"
+    probe="${(L)probe}"
+    if [[ "$probe" == *"successfully authenticated"* || "$probe" == *"does not provide shell access"* ]]; then
+        if "$git" -C "$dir" remote set-url origin "$ssh_url"; then
+            trove_log INFO "git: ${dir:t} origin → SSH (${ssh_url})"
+        else
+            trove_log WARN "git: ${dir:t} failed to set SSH origin"
+        fi
+    else
+        trove_log INFO "git: ${dir:t} staying on HTTP — SSH to ${host} not verified yet (re-run after adding your key)"
+    fi
+    return 0
+}
+
+###############################################################################
 # Initialization
 ###############################################################################
 

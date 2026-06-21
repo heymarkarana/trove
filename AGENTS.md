@@ -62,7 +62,7 @@ names only; each consumer maps them to its own namespace.
 
 ### 2. No homelab identity in code
 
-Names specific to any user's environment (`kuzcotopia`, `thesecretlab`, specific hostnames, etc.) must not appear in Trove source. Trove is a generic library — it has no knowledge of the environment it is installed in.
+Names specific to any user's environment (codenames, hostnames, usernames, domains, etc.) must not appear in Trove source. Trove is a generic library — it has no knowledge of the environment it is installed in.
 
 ### 3. Trove must degrade gracefully
 

@@ -315,3 +315,31 @@
   run trove_stat_group "${TROVE_TEST_DIR}/groupfile"
   assert "$output" is_not_empty
 }
+
+# trove_git_prefer_ssh (seamed: TROVE_SSH_BIN mocks the auth probe; real git)
+
+@test 'trove_git_prefer_ssh switches an http origin to ssh when the key verifies' {
+  trove_log(){ : }
+  local d="${TROVE_TEST_DIR}/repo"; git init -q "$d"; git -C "$d" remote add origin "http://git.demo/u/r.git"
+  print -l '#!/usr/bin/env bash' 'echo "Hi! successfully authenticated; does not provide shell access." >&2; exit 1' > "${TROVE_TEST_DIR}/ssh_ok"
+  chmod +x "${TROVE_TEST_DIR}/ssh_ok"
+  TROVE_SSH_BIN="${TROVE_TEST_DIR}/ssh_ok" trove_git_prefer_ssh "$d"
+  assert "$(git -C "$d" remote get-url origin)" same_as "ssh://git@git.demo/u/r.git"
+}
+
+@test 'trove_git_prefer_ssh leaves an http origin when the key does not verify' {
+  trove_log(){ : }
+  local d="${TROVE_TEST_DIR}/repo2"; git init -q "$d"; git -C "$d" remote add origin "http://git.demo/u/r.git"
+  print -l '#!/usr/bin/env bash' 'echo "Permission denied (publickey)." >&2; exit 255' > "${TROVE_TEST_DIR}/ssh_no"
+  chmod +x "${TROVE_TEST_DIR}/ssh_no"
+  TROVE_SSH_BIN="${TROVE_TEST_DIR}/ssh_no" trove_git_prefer_ssh "$d"
+  assert "$(git -C "$d" remote get-url origin)" same_as "http://git.demo/u/r.git"
+}
+
+@test 'trove_git_prefer_ssh is a no-op on an already-ssh origin' {
+  trove_log(){ : }
+  local d="${TROVE_TEST_DIR}/repo3"; git init -q "$d"; git -C "$d" remote add origin "ssh://git@git.demo/u/r.git"
+  run trove_git_prefer_ssh "$d"
+  assert $state equals 0
+  assert "$(git -C "$d" remote get-url origin)" same_as "ssh://git@git.demo/u/r.git"
+}
