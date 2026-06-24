@@ -48,30 +48,32 @@ trove_ensure_directory() {
 
 # Get absolute path (resolve symlinks)
 # Usage: abs_path=$(trove_get_absolute_path "/path/to/resolve")
+# NB: the local is `target`, never `path` — `path` is a zsh special var aliased to
+# $PATH, so `local path=…` would corrupt PATH and break the external lookups below.
 trove_get_absolute_path() {
-    local path="$1"
-    if [[ -e "$path" ]]; then
+    local target="$1"
+    if [[ -e "$target" ]]; then
         # Use realpath if available, fallback to readlink
         if command -v realpath >/dev/null 2>&1; then
-            realpath "$path"
+            realpath "$target"
         else
-            readlink -f "$path" 2>/dev/null || echo "$path"
+            readlink -f "$target" 2>/dev/null || echo "$target"
         fi
     else
-        echo "$path"
+        echo "$target"
     fi
 }
 
 # Get directory of a file
 # Usage: dir=$(trove_get_directory "/path/to/file")
 trove_get_directory() {
-    local path="$1"
-    if [[ -d "$path" ]]; then
-        echo "$path"
-    elif [[ -f "$path" ]]; then
-        dirname "$path"
+    local target="$1"          # not `path` — see trove_get_absolute_path
+    if [[ -d "$target" ]]; then
+        echo "$target"
+    elif [[ -f "$target" ]]; then
+        dirname "$target"
     else
-        dirname "$path"
+        dirname "$target"
     fi
 }
 
@@ -431,6 +433,41 @@ trove_helpers_help() {
 # Git utilities
 ###############################################################################
 
+# trove_ssh_host_from_url <url> → host (stdout); rc 1 if not derivable.
+# Parses the git-host out of an ssh://git@host[:port]/…, scp-style git@host:owner/repo,
+# or http(s)://host[:port]/… URL (or a bare hostname). Port is stripped.
+trove_ssh_host_from_url() {
+    emulate -L zsh
+    local url="${1:-}" host="" rest
+    [[ -n "$url" ]] || return 1
+    case "$url" in
+        ssh://*)            rest="${url#ssh://}"; rest="${rest#*@}"; host="${rest%%/*}" ;;
+        http://*|https://*) rest="${url#*://}"; host="${rest%%/*}" ;;
+        *://*)              return 1 ;;                              # other scheme
+        *@*:*)              host="${url#*@}"; host="${host%%:*}" ;;  # scp-style git@host:owner/repo
+        *)                  [[ "$url" == */* || "$url" == *:* ]] && return 1; host="$url" ;;
+    esac
+    host="${host%%:*}"                                              # strip :port
+    [[ -n "$host" ]] || return 1
+    print -r -- "$host"
+}
+
+# trove_ssh_verify <host> [user] — does our SSH key authenticate to <host>? Uses
+# BatchMode (never prompts) + accept-new host keys (auto-adds the host key on first
+# contact, so no known_hosts pre-seed needed). Forgejo/GitHub/GitLab return non-zero
+# even on a SUCCESSFUL auth, so we match the greeting banner, not the exit code.
+# Pure-zsh match (no external grep). Seams: TROVE_SSH_BIN, TROVE_SSH_CONNECT_TIMEOUT.
+trove_ssh_verify() {
+    emulate -L zsh
+    local host="${1:-}" user="${2:-git}"
+    [[ -n "$host" ]] || return 1
+    local ssh="${TROVE_SSH_BIN:-ssh}"
+    local probe; probe="$("$ssh" -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+        -o "ConnectTimeout=${TROVE_SSH_CONNECT_TIMEOUT:-6}" -T "${user}@${host}" 2>&1)"
+    probe="${(L)probe}"
+    [[ "$probe" == *"successfully authenticated"* || "$probe" == *"does not provide shell access"* ]]
+}
+
 # trove_git_prefer_ssh <repo-dir>
 # Opportunistically switch a repo's `origin` from http(s):// to ssh:// — but only
 # once the SSH key actually authenticates. Idempotent: an already-ssh origin is a
@@ -440,7 +477,7 @@ trove_git_prefer_ssh() {
     emulate -L zsh
     local dir="${1:-}"
     [[ -n "$dir" ]] || { trove_log ERROR "trove_git_prefer_ssh: need a repo directory"; return 1; }
-    local git="${TROVE_GIT_BIN:-git}" ssh="${TROVE_SSH_BIN:-ssh}"
+    local git="${TROVE_GIT_BIN:-git}"
     [[ -d "${dir}/.git" ]] || { trove_log WARN "trove_git_prefer_ssh: ${dir} is not a git repo"; return 0; }
 
     local url; url="$("$git" -C "$dir" remote get-url origin 2>/dev/null)" || {
@@ -453,17 +490,12 @@ trove_git_prefer_ssh() {
 
     # Derive ssh://git@<host>/<path> from http(s)://<host>[:port]/<path>.
     # NB: avoid `path` — it's a zsh special var aliased to PATH (would corrupt it).
-    local rest="${url#http://}"; rest="${rest#https://}"
-    local host="${rest%%/*}"; local rpath="${rest#*/}"
-    host="${host%%:*}"
+    local host; host="$(trove_ssh_host_from_url "$url")" || {
+        trove_log WARN "git: ${dir:t} could not parse host from origin"; return 0; }
+    local rest="${url#http://}"; rest="${rest#https://}"; local rpath="${rest#*/}"
     local ssh_url="ssh://git@${host}/${rpath}"
 
-    # Verify the key works before switching (BatchMode → never prompt). Forgejo/
-    # GitHub return non-zero even on success, so match the greeting, not the code.
-    # Pure-zsh match (no external grep): capture stderr+stdout and case-fold.
-    local probe; probe="$("$ssh" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T "git@${host}" 2>&1)"
-    probe="${(L)probe}"
-    if [[ "$probe" == *"successfully authenticated"* || "$probe" == *"does not provide shell access"* ]]; then
+    if trove_ssh_verify "$host"; then
         if "$git" -C "$dir" remote set-url origin "$ssh_url"; then
             trove_log INFO "git: ${dir:t} origin → SSH (${ssh_url})"
         else

@@ -343,3 +343,38 @@
   assert $state equals 0
   assert "$(git -C "$d" remote get-url origin)" same_as "ssh://git@git.demo/u/r.git"
 }
+
+# trove_ssh_host_from_url — parse the git host out of every URL shape
+
+@test 'trove_ssh_host_from_url parses ssh / scp / http(s) / bare forms (strips port)' {
+  assert "$(trove_ssh_host_from_url 'ssh://git@git.demo:2222/u/r.git')" same_as 'git.demo'
+  assert "$(trove_ssh_host_from_url 'git@git.demo:u/r.git')"            same_as 'git.demo'
+  assert "$(trove_ssh_host_from_url 'https://git.demo/u/r.git')"        same_as 'git.demo'
+  assert "$(trove_ssh_host_from_url 'http://git.demo:3000/u/r')"        same_as 'git.demo'
+  assert "$(trove_ssh_host_from_url 'git.demo')"                        same_as 'git.demo'
+}
+
+@test 'trove_ssh_host_from_url fails on empty / unparseable input' {
+  run trove_ssh_host_from_url ''
+  assert $state not_equal_to 0
+  run trove_ssh_host_from_url 'ftp://nope/x'
+  assert $state not_equal_to 0
+}
+
+# trove_ssh_verify — match the git-host greeting, not the (non-zero) exit code
+
+@test 'trove_ssh_verify succeeds when the host returns the auth greeting' {
+  print -l '#!/usr/bin/env bash' 'echo "Hi! You'\''ve successfully authenticated, but Forgejo does not provide shell access." >&2; exit 1' > "${TROVE_TEST_DIR}/ssh_ok"
+  chmod +x "${TROVE_TEST_DIR}/ssh_ok"
+  export TROVE_SSH_BIN="${TROVE_TEST_DIR}/ssh_ok"
+  run trove_ssh_verify git.demo
+  assert $state equals 0
+}
+
+@test 'trove_ssh_verify fails on permission denied' {
+  print -l '#!/usr/bin/env bash' 'echo "Permission denied (publickey)." >&2; exit 255' > "${TROVE_TEST_DIR}/ssh_no"
+  chmod +x "${TROVE_TEST_DIR}/ssh_no"
+  export TROVE_SSH_BIN="${TROVE_TEST_DIR}/ssh_no"
+  run trove_ssh_verify git.demo
+  assert $state not_equal_to 0
+}

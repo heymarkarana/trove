@@ -5,6 +5,26 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-24
+
+### Added
+- **`trove_ssh_host_from_url`** + **`trove_ssh_verify`** (`lib/trove_helpers.zsh`) — generic
+  SSH transport helpers. `host_from_url` parses the git host out of ssh:// / scp-style /
+  http(s):// URLs (or a bare host), stripping any port. `verify <host> [user]` answers
+  "does our key authenticate?" via `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new
+  -T` and matching the git-host greeting banner (Forgejo/GitHub/GitLab return non-zero even
+  on success). Seams: `TROVE_SSH_BIN`, `TROVE_SSH_CONNECT_TIMEOUT`. Consumed by dotFiles'
+  SSH-key provisioning. Tests: `tests/test_helpers.zunit`.
+
+### Changed
+- **`trove_git_prefer_ssh` refactored** to use the new `trove_ssh_host_from_url` /
+  `trove_ssh_verify` helpers (no behavior change — same verify-before-switch, idempotent flip).
+
+### Fixed
+- **`trove_get_absolute_path` / `trove_get_directory`** used `local path=…`, which corrupts
+  `$PATH` (zsh ties the `path` var to `$PATH`) and silently broke the `realpath`/`readlink`/
+  `dirname` lookups inside them. Renamed the local to `target`.
+
 ## [1.0.3] - 2026-06-21
 
 ### Changed
