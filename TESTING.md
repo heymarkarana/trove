@@ -2,12 +2,19 @@
 
 ## Summary
 
-✅ **Comprehensive test suite implemented and passing**
+✅ **Comprehensive test suite implemented**
 
 - **Framework**: zunit (native zsh testing framework)
-- **Total Tests**: 134
-- **Status**: All passing on macOS
-- **Coverage**: All 5 core libraries + CLI + integration
+- **Test suites**: 9 · **Total Tests**: 205
+- **Status (macOS)**: green in a standard shell; a couple of suites are sensitive
+  to a fully-loaded dotFiles environment (run via `dotFiles smoketest macos`)
+- **Coverage**: all core libraries + Atlas + requirements + CLI + integration
+
+> **Last refreshed.** The suite list/counts below now match the repo — the prior
+> "6 suites / 134 tests" predated `test_atlas`, `test_atlas_env`, and
+> `test_requirements`. The runner (`tests/run_tests.sh`) was also fixed: it
+> previously aborted after the first suite (a `set -e` + `(( n++ ))` footgun) and
+> could not report the rest; it now runs and tallies all 9.
 
 ## Test Suites Created
 
@@ -97,6 +104,12 @@ Tests for `/opt/trove/lib/trove_date.zsh`
 - All 28 date/time functions exist and are callable
 - Function signatures are correct
 
+### 7–9. Atlas + requirements (added after the original 6)
+
+- **`test_atlas.zunit`** — the Atlas discovery API (`get`/`require`/`tool`/`set`/`unset`/`dump`/`sync`): full resolution order (env → registry → default), fail-loud on unresolved instance facts, and operation under `env -i` (no `$HOME`) with only a temp registry.
+- **`test_atlas_env.zunit`** — `atlas-env` emits neutral `ATLAS_*` export lines consumable from bash with no `$HOME`, leaking no consumer-namespace variables.
+- **`test_requirements.zunit`** — the dependency-checking module: `trove_version_parse`/`_compare`/`_satisfies`, `trove_get_command_version`, `_trove_pkg_install_cmd` hints, `trove_require_status` (+ JSON), and `trove_requirements_check` manifest loading.
+
 ### 6. `test_integration.zunit` (29 tests)
 Cross-library integration and real-world workflows
 
@@ -175,15 +188,21 @@ done
 ## Test Results (macOS)
 
 ```
-test_colors.zunit       ✓ 13/13 passed
-test_date.zunit         ✓ 28/28 passed
-test_helpers.zunit      ✓ 30/30 passed
-test_integration.zunit  ✓ 29/29 passed
-test_logging.zunit      ✓ 19/19 passed
-test_monitoring.zunit   ✓ 15/15 passed
+test_atlas.zunit        19 tests
+test_atlas_env.zunit     4 tests
+test_colors.zunit       15 tests
+test_date.zunit         28 tests
+test_helpers.zunit      44 tests
+test_integration.zunit  31 tests
+test_logging.zunit      26 tests
+test_monitoring.zunit   15 tests
+test_requirements.zunit 23 tests
 
-Total: ✓ 134/134 tests passed
+Total: 9 suites · 205 tests
 ```
+
+Run the whole stack (Trove + Beskar + dotFiles) on the current platform with
+`dotFiles smoketest macos` (or `ubuntu` on a VM).
 
 ## Implementation Notes
 

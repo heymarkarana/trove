@@ -2,7 +2,11 @@
 # Trove Test Runner
 # Runs all test suites with zunit
 
-set -e
+# NB: intentionally NO `set -e`. This runner must run ALL suites and tally, then
+# exit non-zero at the end if any failed. `set -e` was a bug here: with
+# `out=$(zunit …)` it aborted on the first FAILING suite, and with the `(( n++ ))`
+# footgun (which returns exit status 1 when n==0) it aborted after the first
+# PASSING suite — so the runner could never report past suite one.
 
 # Colors for output
 RED='\033[0;31m'
@@ -59,9 +63,9 @@ for test_file in "${TEST_FILES[@]}"; do
   echo "$output"
 
   if [ $exit_code -eq 0 ]; then
-    ((PASSED++))
+    (( ++PASSED ))
   else
-    ((FAILED++))
+    (( ++FAILED ))
   fi
 
   # Extract test counts from output.
