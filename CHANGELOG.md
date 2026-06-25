@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   -T` and matching the git-host greeting banner (Forgejo/GitHub/GitLab return non-zero even
   on success). Seams: `TROVE_SSH_BIN`, `TROVE_SSH_CONNECT_TIMEOUT`. Consumed by dotFiles'
   SSH-key provisioning. Tests: `tests/test_helpers.zunit`.
+- **`trove-skill.md`** — a Claude Code skill documenting Trove's logging, color schemes,
+  helpers, date utilities, monitoring, and the `klog`/`kreq` CLIs, plus the discover-don't-
+  hardcode loading contract and the repo's architecture rules.
 
 ### Changed
 - **`trove_git_prefer_ssh` refactored** to use the new `trove_ssh_host_from_url` /
