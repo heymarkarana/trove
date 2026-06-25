@@ -28,10 +28,33 @@ the foundation layer other tools build on — it has no dependencies of its own.
 
 ### Installation
 
+**From a local checkout** (default install root is `/opt/trove`):
+
 ```sh
-# From the Trove checkout (default install root is /opt/trove):
 ./install
 ```
+
+**Cold-start over the network** (`spark.sh` — clones to `/opt/trove`, then runs
+`./install`). Run it **as your normal user** (never sudo/root; it escalates only
+the system steps). The branch is chosen in **two places that must match** — the
+`SPARK_REF` env var (the branch cloned) and the `raw/branch/<branch>/` segment of
+the URL (the branch `spark.sh` is fetched from):
+
+```sh
+export SPARK_REPO_BASE="http://git.<your-domain>/<user>"   # your git host + namespace
+
+# Production — the released `main` branch:
+export SPARK_REF=main
+curl -fsSL "$SPARK_REPO_BASE/trove/raw/branch/main/spark.sh" | bash
+
+# Development — the `next` branch (the default if SPARK_REF is unset):
+export SPARK_REF=next
+curl -fsSL "$SPARK_REPO_BASE/trove/raw/branch/next/spark.sh" | bash
+```
+
+`SPARK_REF` accepts a branch **or a release tag** (pin a reproducible install).
+Trove is the foundation tier; to install the **full stack** (Trove → Beskar →
+dotFiles) in one shot, run dotFiles' `spark.sh` instead — see the dotFiles README.
 
 The installer is bash (so it runs on a box without zsh yet). It ensures Trove's
 one runtime dependency — **zsh** — is present (installing it via the platform
