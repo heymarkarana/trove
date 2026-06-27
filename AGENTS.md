@@ -76,13 +76,13 @@ Always load via `df_bootstrap` when working in dotFiles scripts:
 
 ```zsh
 source "${DF_HOME}/lib/df_bootstrap.zsh" && df_bootstrap
-# TROVE_PATH is now set; trove_log and friends are available
+# TROVE_HOME is now set; trove_log and friends are available
 ```
 
 For standalone scripts outside dotFiles, source the minimum needed:
 
 ```zsh
-source "${TROVE_PATH}/lib/trove_logging.zsh"
+source "${TROVE_HOME}/lib/trove_logging.zsh"
 # Optionally add helpers, date, monitoring as needed
 ```
 
@@ -190,8 +190,8 @@ Resolve the path via `$TROVE_HOME` (or a `klog` on `PATH`) — never hardcode it
 
 ```zsh
 #!/usr/bin/env zsh
-source "${TROVE_PATH}/lib/trove_logging.zsh"
-source "${TROVE_PATH}/lib/trove_helpers.zsh"
+source "${TROVE_HOME}/lib/trove_logging.zsh"
+source "${TROVE_HOME}/lib/trove_helpers.zsh"
 
 trove_bot "MyApp Installation"
 
@@ -209,13 +209,18 @@ fi
 trove_ok "Installation complete"
 ```
 
+> In real code, resolve `klog` from `$TROVE_HOME` or `PATH` — don't hardcode the
+> path. The literals below are illustrative only.
+
 ### Logging from Python
 
 ```python
-import subprocess
+import os, subprocess
+
+KLOG = os.path.join(os.environ.get("TROVE_HOME", "/opt/trove"), "bin", "klog")
 
 def klog(level, message):
-    subprocess.run(["/opt/trove/bin/klog", level, message])
+    subprocess.run([KLOG, level, message])
 
 klog("INFO", "Application started")
 klog("ERROR", "Connection failed")
@@ -224,10 +229,18 @@ klog("ERROR", "Connection failed")
 ### Logging from Go
 
 ```go
-import "os/exec"
+import (
+    "os"
+    "os/exec"
+    "path/filepath"
+)
 
 func klog(level, message string) {
-    exec.Command("/opt/trove/bin/klog", level, message).Run()
+    home := os.Getenv("TROVE_HOME")
+    if home == "" {
+        home = "/opt/trove"
+    }
+    exec.Command(filepath.Join(home, "bin", "klog"), level, message).Run()
 }
 ```
 
