@@ -1,0 +1,4 @@
+# lint-output-style path exemptions (one path-prefix regex per line).
+# The test bootstrap defines its own colors and runs BEFORE Trove is sourced
+# (it is what tests Trove), so it legitimately cannot use COL_*.
+tests/run_tests\.sh
