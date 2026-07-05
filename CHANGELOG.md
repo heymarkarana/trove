@@ -5,6 +5,24 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-07-04
+
+### Added
+- **CLI Output Style Guide** — the shared visual language for every CLI built on
+  Trove (dotFiles, Beskar, downstream). `docs/cli-style-guide.md` (human guide +
+  rationale), `docs/STYLE.md` (terse, gradeable agent rules), and
+  `docs/cli-style-guide.html` (visual companion rendering the palette in real
+  color). Covers the eight semantic color roles, the glyph vocabulary, structure
+  (inline/ruled headers, the leading-space rule, alignment), the full-command
+  `#`-comment and first-class source-reference rules, output channels, and color
+  integration (the `print -r` materialization gotcha + `trove_set_colorscheme`).
+- **`tools/lint-output-style.sh`** — gate for the one mechanical rule (no hardcoded
+  color escapes; reference `COL_*`), honoring a repo `.styleignore` and inline
+  `# style:allow` opt-outs; scans another checkout via `--root`.
+
+### Changed
+- `docs/API.md` — pointer from the Color Management section to the style guide.
+
 ## [1.1.0] - 2026-06-24
 
 ### Added

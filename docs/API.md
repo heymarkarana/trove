@@ -221,6 +221,9 @@ trove_set_output_display true   # Re-enable
 
 ## Color Management
 
+> **Using colors in output?** Follow the [CLI Output Style Guide](./cli-style-guide.md)
+> (semantic roles, structure, channels) — enforced by `tools/lint-output-style.sh`.
+
 ### `trove_set_colorscheme SCHEME`
 
 Set the color scheme.

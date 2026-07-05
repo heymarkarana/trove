@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Visual companion to cli-style-guide.md. Markdown cannot render color/
+     swatches, so this exists to SHOW the palette. Keep in sync with the .md
+     when the palette, roles, or structural rules change. -->
+<title>CLI Output Style Guide</title>
+<style>
+  :root{
+    --bg:#151614; --surface:#1b1c19; --surface-2:#212320;
+    --text:#d7d6cd; --muted:#8f8d83; --faint:#66655d;
+    --border:#2b2c28; --border-strong:#3a3b36;
+    --accent:#af87ff; --accent-2:#5fd7ff;
+    --radius:10px;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    /* terminal palette — the real Monokai 256-color values, intrinsic to the subject */
+    --t-bg:#1e1f1c; --t-fg:#cbcabf; --t-header:#af87ff; --t-key:#5fd7ff;
+    --t-val:#ececec; --t-ok:#5fd75f; --t-warn:#ffd700; --t-err:#ff5f5f;
+    --t-orange:#ffaf5f; --t-blue:#5fafff; --t-muted:#6f6e66; --t-rule:#3a3b36;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f2ea; --surface:#fffdf6; --surface-2:#f9f6ec;
+      --text:#26261f; --muted:#66645b; --faint:#9a988c;
+      --border:#e4e0d3; --border-strong:#d3cebd;
+      --accent:#7a4fce; --accent-2:#1f8fb0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#151614; --surface:#1b1c19; --surface-2:#212320;
+    --text:#d7d6cd; --muted:#8f8d83; --faint:#66655d;
+    --border:#2b2c28; --border-strong:#3a3b36; --accent:#af87ff; --accent-2:#5fd7ff;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f2ea; --surface:#fffdf6; --surface-2:#f9f6ec;
+    --text:#26261f; --muted:#66645b; --faint:#9a988c;
+    --border:#e4e0d3; --border-strong:#d3cebd; --accent:#7a4fce; --accent-2:#1f8fb0;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);
+    line-height:1.6;margin:0;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:clamp(1.4rem,4vw,3.5rem) clamp(1.1rem,4vw,2.2rem) 5rem}
+
+  /* ---- masthead ---- */
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 .9rem}
+  h1{font-family:var(--mono);font-weight:700;font-size:clamp(1.7rem,5vw,2.6rem);
+    line-height:1.08;margin:0 0 .8rem;letter-spacing:-.01em;text-wrap:balance}
+  .lede{font-size:1.06rem;color:var(--text);max-width:60ch;margin:0}
+  .lede b{color:var(--accent);font-weight:600}
+  .meta{font-family:var(--mono);font-size:.76rem;color:var(--muted);
+    margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:.4rem 1.3rem}
+  .meta span::before{content:"› ";color:var(--accent)}
+
+  /* ---- ruled section header (dogfoods the standard) ---- */
+  section{margin-top:3.4rem}
+  .rule{display:flex;align-items:center;gap:.85rem;margin-bottom:1.4rem}
+  .rule h2{font-family:var(--mono);font-size:.86rem;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--accent);white-space:nowrap;margin:0;font-weight:600}
+  .rule::before{content:"";height:1px;width:1.6rem;background:var(--border-strong);flex:0 0 auto}
+  .rule::after{content:"";height:1px;background:var(--border-strong);flex:1}
+  .lead{color:var(--muted);max-width:64ch;margin:-.5rem 0 1.5rem;font-size:.97rem}
+
+  /* ---- palette swatches ---- */
+  .swatches{display:grid;gap:.55rem}
+  .sw{display:grid;grid-template-columns:2.6rem 1fr;gap:.9rem;align-items:stretch;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:.7rem .8rem}
+  .chip{border-radius:7px;min-height:2.9rem;background:var(--_c,#888);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .sw-body{display:flex;flex-direction:column;gap:.15rem;min-width:0}
+  .sw-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem .8rem}
+  .role{font-weight:650;font-size:.98rem}
+  .tok{font-family:var(--mono);font-size:.76rem;color:var(--accent-2);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:.05rem .4rem}
+  .hex{font-family:var(--mono);font-size:.73rem;color:var(--faint);margin-left:auto}
+  .use{font-size:.86rem;color:var(--muted)}
+
+  /* ---- terminal pane ---- */
+  .term{background:var(--t-bg);border:1px solid #34352f;border-radius:12px;
+    overflow:hidden;box-shadow:0 14px 40px -22px rgba(0,0,0,.7);margin:1rem 0}
+  .term-bar{display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;
+    background:#151612;border-bottom:1px solid #2c2d28}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+  .term-title{font-family:var(--mono);font-size:.72rem;color:#7b7a72;margin-left:.4rem}
+  .term-tag{margin-left:auto;font-family:var(--mono);font-size:.68rem;color:#5f5e57;
+    letter-spacing:.12em;text-transform:uppercase}
+  pre.code{margin:0;padding:1rem 1.15rem;overflow-x:auto;
+    font-family:var(--mono);font-size:.83rem;line-height:1.55;color:var(--t-fg)}
+  pre.code b{font-weight:700}
+  .h{color:var(--t-header);font-weight:700}   /* header  */
+  .k{color:var(--t-key)}                        /* key     */
+  .v{color:var(--t-val);font-weight:700}        /* value   */
+  .ok{color:var(--t-ok)}                        /* success */
+  .wn{color:var(--t-warn)}                      /* warning */
+  .er{color:var(--t-err)}                       /* error   */
+  .or{color:var(--t-orange)}
+  .ac{color:var(--t-blue)}                      /* accent  */
+  .mu{color:var(--t-muted)}                     /* muted   */
+  .rl{color:var(--t-rule)}                      /* rules   */
+  .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.13em;margin:.2rem 0 .4rem}
+
+  .grid2{display:grid;gap:1rem}
+  @media(min-width:680px){.grid2{grid-template-columns:1fr 1fr}}
+
+  /* ---- glyph + type tables ---- */
+  .rows{display:grid;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .row{display:grid;grid-template-columns:auto 1fr;gap:.9rem;align-items:baseline;
+    padding:.6rem .85rem;border-top:1px solid var(--border);background:var(--surface)}
+  .row:first-child{border-top:none}
+  .row .g{font-family:var(--mono);font-size:1rem;min-width:2.4rem}
+  .row .d{font-size:.9rem;color:var(--text)}
+  .row .d small{color:var(--muted);display:block;font-size:.8rem}
+  .gy{color:var(--t-muted)}
+
+  /* ---- callout for the leading-space rule ---- */
+  .callout{background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--accent);border-radius:var(--radius);padding:1rem 1.1rem;margin:1.1rem 0}
+  .callout .cap{margin-top:0}
+  .callout p{margin:.4rem 0 0;font-size:.92rem;color:var(--muted)}
+  .callout code{font-family:var(--mono);color:var(--accent-2);background:var(--surface-2);
+    padding:.05rem .35rem;border-radius:4px;font-size:.85em}
+
+  /* ---- checklist ---- */
+  ul.check{list-style:none;padding:0;margin:0;display:grid;gap:.5rem}
+  ul.check li{display:grid;grid-template-columns:1.3rem 1fr;gap:.6rem;align-items:baseline;
+    font-size:.94rem;padding:.55rem .8rem;background:var(--surface);
+    border:1px solid var(--border);border-radius:8px}
+  ul.check li::before{content:"▪";color:var(--accent);font-family:var(--mono)}
+  ul.check code{font-family:var(--mono);font-size:.85em;color:var(--accent-2)}
+
+  .docs{display:grid;gap:1rem;margin-top:.5rem}
+  @media(min-width:680px){.docs{grid-template-columns:1fr 1fr}}
+  .doc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.2rem}
+  .doc h3{font-family:var(--mono);margin:0 0 .3rem;font-size:.95rem;color:var(--accent)}
+  .doc .who{font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem}
+  .doc p{margin:0;font-size:.9rem;color:var(--muted)}
+  .doc ul{margin:.6rem 0 0;padding-left:1.1rem;font-size:.87rem;color:var(--text)}
+  .doc li{margin:.2rem 0}
+
+  footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--border);
+    font-family:var(--mono);font-size:.76rem;color:var(--faint)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <p class="eyebrow">CLI Output Standard · draft for review</p>
+  <h1>A visual language<br>for the command line</h1>
+  <p class="lede">Color, weight, and structure aren't decoration — they're how a terminal
+  communicates <b>subtle organization and consistency</b> at a glance. This distills the
+  system already living in dotFiles into one generic standard, so every CLI —
+  dotFiles, Beskar, Trove, and whatever's next — reads as one family.</p>
+  <div class="meta">
+    <span>Theme-agnostic: roles, not raw codes</span>
+    <span>Built on Trove <code style="font-family:var(--mono)">COL_*</code></span>
+    <span>Reference theme: Monokai</span>
+  </div>
+
+  <!-- PALETTE -->
+  <section>
+    <div class="rule"><h2>The Palette</h2></div>
+    <p class="lead">Eight semantic <em>roles</em>. Code never names a color for how it looks —
+    it names it for what it <em>means</em>, so the same source renders correctly under Monokai,
+    Nord, Gruvbox, or any Trove theme. Swatches show the Monokai reference values.</p>
+
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="--_c:#af87ff"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Header</span><span class="tok">COL_BOLD_PURPLE</span><span class="hex">bold · 141</span></div>
+        <div class="use">Section titles &amp; the command-name banner — the top of every hierarchy.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#5fd7ff"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Key / label</span><span class="tok">COL_CYAN</span><span class="hex">81</span></div>
+        <div class="use">Field names, subcommand names — the left column you scan down.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#ececec"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Value</span><span class="tok">COL_BOLD</span><span class="hex">bold · default fg</span></div>
+        <div class="use">The primary datum — versions, counts, the thing the line is about.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#5fd75f"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Success</span><span class="tok">COL_GREEN</span><span class="hex">114</span></div>
+        <div class="use">OK · clean · match · enabled · healthy. Pairs with <span class="ok" style="font-family:var(--mono)">✔</span>.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#ffd700"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Warning</span><span class="tok">COL_YELLOW</span><span class="hex">220</span></div>
+        <div class="use">Attention, not failure — dirty, pending, degraded. Pairs with <span class="wn" style="font-family:var(--mono)">⚠</span>.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#ff5f5f"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Error</span><span class="tok">COL_RED</span><span class="hex">203</span></div>
+        <div class="use">Failure or a critical alert. Pairs with <span class="er" style="font-family:var(--mono)">✖</span>. Use sparingly so it stays loud.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#585858"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Muted</span><span class="tok">COL_GRAY</span><span class="hex">240</span></div>
+        <div class="use">Metadata, hints, timestamps, separators, disabled state — present but recessive.</div></div></div>
+
+      <div class="sw"><div class="chip" style="--_c:#5fafff"></div><div class="sw-body">
+        <div class="sw-top"><span class="role">Accent</span><span class="tok">COL_BLUE</span><span class="hex">75 · also COL_PURPLE</span></div>
+        <div class="use">Interactive &amp; navigational — prompts, branch names, links, selectable items.</div></div></div>
+    </div>
+  </section>
+
+  <!-- GLYPHS -->
+  <section>
+    <div class="rule"><h2>Glyphs</h2></div>
+    <p class="lead">A fixed vocabulary, each locked to a role's color. Shape carries meaning even
+    where color can't (pipes, colorblind readers, <code style="font-family:var(--mono);font-size:.85em">NO_COLOR</code>).</p>
+    <div class="grid2">
+      <div class="rows">
+        <div class="row"><span class="g ok">✔</span><span class="d">Success / match <small>green — the affirmative</small></span></div>
+        <div class="row"><span class="g er">✖</span><span class="d">Error / failure <small>red</small></span></div>
+        <div class="row"><span class="g wn">⚠</span><span class="d">Warning <small>yellow</small></span></div>
+        <div class="row"><span class="g gy">·</span><span class="d">Neutral bullet / no-match <small>gray</small></span></div>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="g" style="color:var(--t-fg)">➤</span><span class="d">Result / action taken <small>trove_ok</small></span></div>
+        <div class="row"><span class="g h">✪</span><span class="d">Interactive / prompt <small>trove_bot</small></span></div>
+        <div class="row"><span class="g"><span class="ok">●</span></span><span class="d">Status dot <small>green / yellow / red — up · degraded · down</small></span></div>
+        <div class="row"><span class="g mu">→ ←</span><span class="d">Flow &amp; annotation <small>match →, ← MATCH, ↑ ↓ ahead/behind</small></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TYPE TOOLS -->
+  <section>
+    <div class="rule"><h2>Weight &amp; Style</h2></div>
+    <p class="lead">Color is the primary channel; SGR attributes are the second. Use what the line
+    needs — not all of them, every time. Reach down this list as emphasis escalates.</p>
+    <div class="rows">
+      <div class="row"><span class="g"><b style="color:var(--t-val)">Bold</b></span><span class="d">Primary emphasis — versions, the matched value, a key figure. The everyday second channel.</span></div>
+      <div class="row"><span class="g mu" style="opacity:.6">Dim</span><span class="d">A softer mute than gray for inline secondary text. <small>SGR 2 — check your terminal renders it</small></span></div>
+      <div class="row"><span class="g" style="font-style:italic;color:var(--t-fg)">Italic</span><span class="d">Optional annotation / captions. <small>SGR 3 — inconsistent support; never load-bearing</small></span></div>
+      <div class="row"><span class="g" style="text-decoration:underline;color:var(--t-key)">Underline</span><span class="d">Actionable paths &amp; URLs, or the live heading. <small>SGR 4 — sparingly</small></span></div>
+      <div class="row"><span class="g" style="background:var(--t-err);color:#1e1f1c;padding:0 .3rem;border-radius:3px">Reverse</span><span class="d">Reserved for max severity — a status bar, a selected row, a blocking alert. <small>SGR 7 — rare by design</small></span></div>
+    </div>
+  </section>
+
+  <!-- STRUCTURE -->
+  <section>
+    <div class="rule"><h2>Structure</h2></div>
+    <p class="lead"><b style="color:var(--text)">Inline is the default</b> — dotFiles and Beskar
+    both use it throughout. Reach for the ruled form only when a screen is so dense that inline
+    titles don't separate the groups clearly enough. Both put the title in the
+    <span style="color:var(--accent)">Header</span> role.</p>
+
+    <div class="grid2">
+      <div>
+        <p class="cap">A · Inline header — status &amp; info</p>
+        <div class="term">
+          <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">status</span></div>
+<pre class="code"><span class="h">Paths</span>
+  <span class="k">install</span>     /opt/dotFiles_data
+  <span class="k">config</span>      /opt/dotFiles_data/.config
+  <span class="k">beskar</span>      /opt/beskar</pre>
+        </div>
+        <p class="use" style="font-size:.85rem">Title, then an aligned key/value block. The default for dashboards.</p>
+      </div>
+
+      <div>
+        <p class="cap">B · Ruled header — dense help</p>
+        <div class="term">
+          <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">help</span></div>
+<pre class="code"><span class="rl">────────────────────────────</span>
+<span class="h"> CONFIGURATION</span>
+<span class="rl">────────────────────────────</span>
+  <span class="k">config</span>       Show config
+  <span class="k">config init</span>  Initialize it</pre>
+        </div>
+        <p class="use" style="font-size:.85rem">Rule, title, rule — the exception, for exceptionally dense help.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p class="cap">The one rule that's easy to miss</p>
+      <p>A ruled heading gets <b style="color:var(--text)">exactly one leading space</b> before the
+      word — <code> CONFIGURATION</code>, not <code>CONFIGURATION</code> flush to the margin.
+      That single space lifts the title off the rule and reads as a deliberate label instead of
+      a run-on. It's the difference between <span class="mu" style="font-family:var(--mono)">───/word/───</span>
+      looking typeset versus accidental.</p>
+    </div>
+  </section>
+
+  <!-- COMMANDS & REFERENCES -->
+  <section>
+    <div class="rule"><h2>Commands &amp; References</h2></div>
+    <p class="lead">Beyond the header/value block, two row shapes — both keep the command in the
+    <span style="color:var(--accent-2)">Key</span> role, and differ in how the right side reads.</p>
+
+    <div class="grid2">
+      <div>
+        <p class="cap">Full command → # comment</p>
+        <div class="term">
+          <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">copy-pasteable</span></div>
+<pre class="code"><span class="k">beskar config</span>     <span class="mu"># Show current config</span>
+<span class="k">dotFiles up trove</span> <span class="mu"># Update only Trove</span></pre>
+        </div>
+        <p class="use" style="font-size:.85rem">A runnable command gets its description as a muted
+        <code style="font-family:var(--mono)">#</code> comment — the whole line pastes as valid shell.</p>
+      </div>
+
+      <div>
+        <p class="cap">Bare token → plain description</p>
+        <div class="term">
+          <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">reference</span></div>
+<pre class="code"><span class="h">Commands:</span>
+  <span class="k">on</span>               Enable the trailer
+  <span class="k">--setup</span>          Create the symlink
+  <span class="k">issue [domain]</span>   Issue a cert</pre>
+        </div>
+        <p class="use" style="font-size:.85rem">A subcommand name, flag, or arg placeholder isn't
+        runnable on its own — plain aligned text, no <code style="font-family:var(--mono)">#</code>.</p>
+      </div>
+    </div>
+
+    <p class="cap" style="margin-top:1.5rem">Source references — first-class</p>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">beskar help config</span></div>
+<pre class="code"><span class="h">Library:</span>
+  <span class="k">lib/beskar_config_commands.zsh</span> — beskar_config_init, validate, edit, show
+  <span class="k">lib/beskar_config.zsh</span>          — beskar_load_config, beskar_validate_config, …</pre>
+    </div>
+    <p class="use" style="font-size:.9rem">A <code style="font-family:var(--mono)">Library:</code> /
+    <code style="font-family:var(--mono)">Registry:</code> / <code style="font-family:var(--mono)">Resolver:</code>
+    pointer (file → its key functions) is a full section: <span style="color:var(--accent)">Header</span> label,
+    <span style="color:var(--accent-2)">Key</span> paths, plain functions, an em-dash (a definition, not a
+    command — so no <code style="font-family:var(--mono)">#</code>), aligned down the block.</p>
+  </section>
+
+  <!-- EXAMPLE: the fix -->
+  <section>
+    <div class="rule"><h2>Applied · Beskar help</h2></div>
+    <p class="lead">Same content, brought into the standard. Uppercase-plain headings become
+    <span style="color:var(--accent)">inline</span> Header titles; the
+    <code style="font-family:var(--mono);font-size:.85em">====</code> slab and
+    <code style="font-family:var(--mono);font-size:.85em">━━━</code> rules are dropped; command names take
+    the <span style="color:var(--accent-2)">Key</span> role with descriptions as
+    <code style="font-family:var(--mono);font-size:.85em">#</code> comments; the
+    <code style="font-family:var(--mono);font-size:.85em">Library:</code> pointer gets first-class weight.
+    Nothing about the information changed — only its legibility.</p>
+
+    <p class="cap">Before</p>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">beskar — current</span></div>
+<pre class="code">Beskar - Secure Environment Variable Manager
+=============================================
+Armory: ~/.config/beskar/armory
+
+USAGE:
+  beskar [--json|--porcelain] &lt;command&gt; [arguments]
+
+CONFIGURATION
+  beskar config          Show current configuration
+  beskar config init     Initialize config file</pre>
+    </div>
+
+    <p class="cap">After — conformant (inline · # comments · first-class Library)</p>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">beskar — standard</span><span class="term-tag">monokai</span></div>
+<pre class="code"><span class="k" style="font-weight:700">beskar</span> — Secure Environment Variable Manager
+  <span class="mu">armory: ~/.config/beskar/armory</span>
+
+<span class="h">Usage:</span>
+  <span class="k">beskar [--json|--porcelain] &lt;command&gt; [args]</span>
+
+<span class="h">Configuration</span>
+  <span class="k">beskar config</span>        <span class="mu"># Show current configuration</span>
+  <span class="k">beskar config init</span>   <span class="mu"># Initialize config file</span>
+
+<span class="h">Library:</span>
+  <span class="k">lib/beskar_config_commands.zsh</span> — beskar_config_init, validate, edit, show
+  <span class="k">lib/beskar_config.zsh</span>          — beskar_load_config, beskar_validate_config, …</pre>
+    </div>
+  </section>
+
+  <!-- EXAMPLE: reference status -->
+  <section>
+    <div class="rule"><h2>Applied · dotFiles status</h2></div>
+    <p class="lead">The reference implementation — every role doing its job at once.</p>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">d status</span></div>
+<pre class="code"><span class="h">dotFiles</span> <span class="v">5.0.6</span>  <span class="mu">·</span>  macos  <span class="mu">·</span>  workstation
+
+<span class="h">Repos</span>
+  <span class="k">dotFiles</span>   next <span class="wn">(dirty)</span> <span class="mu">↑0 ↓0</span> <span class="mu">(2026-07-04 09:36)</span>
+  <span class="k">trove</span>      next <span class="ok">(clean)</span> <span class="mu">↑0 ↓0</span> <span class="mu">(2026-07-04 09:36)</span>
+
+<span class="h">Features</span>
+  <span class="k">enabled</span>    certbot, claude, config_backup, wallpaper
+
+<span class="h">wallpaper</span> <span class="mu">(network-aware)</span>
+  <span class="ok">✔</span> <span class="k">ssid</span>     HomeNet       <span class="ok">← MATCH</span>
+  <span class="mu">·</span> <span class="k">subnet</span>   192.168.1.0/24  <span class="ok">← MATCH</span>
+  <span class="mu">·</span> <span class="k">public</span>   203.0.113.7</pre>
+    </div>
+  </section>
+
+  <!-- CHANNELS -->
+  <section>
+    <div class="rule"><h2>Channels</h2></div>
+    <p class="lead">Where output goes matters as much as how it looks.</p>
+    <ul class="check">
+      <li><span><b>Status, progress, errors → the <code>trove_*</code> loggers → stderr.</b> They apply the role color and glyph for you. Never hand-roll status with raw <code>echo</code>.</span></li>
+      <li><span><b>Structured, tabular &amp; help text → <code>echo</code>/<code>printf</code> with <code>COL_*</code> → stdout.</b> This is the only place you write color yourself.</span></li>
+      <li><span><b><code>--json</code> / <code>--porcelain</code> → zero color, ever.</b> Machine output must stay byte-stable. Beskar already gates this — codify it everywhere.</span></li>
+      <li><span><b>Honor <code>NO_COLOR</code> and non-TTY.</b> When stdout isn't a terminal, degrade to plain text; glyph shapes still carry meaning.</span></li>
+    </ul>
+  </section>
+
+  <!-- INTEGRATING COLOR -->
+  <section>
+    <div class="rule"><h2>Integrating Color</h2></div>
+    <p class="lead">Two things bite when you wire this into a CLI — how the escapes are stored, and
+    how a theme gets chosen.</p>
+
+    <div class="grid2">
+      <div>
+        <p class="cap">COL_* are literal strings</p>
+        <div class="term">
+          <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">materialize</span></div>
+<pre class="code"><span class="mu"># echo / printf-format interpret them:</span>
+printf "<span class="k">${COL_CYAN}</span>%s<span class="k">${COL_RESET}</span>\n" "$k"
+
+<span class="mu"># print -r does NOT (emits \033 literally):</span>
+c=$(print -- "<span class="k">$COL_CYAN</span>")   <span class="mu"># once</span>
+print -r -- "${c}${path}${rst}"</pre>
+        </div>
+        <p class="use" style="font-size:.85rem"><code style="font-family:var(--mono)">COL_*</code> hold literal
+        <code style="font-family:var(--mono)">\033[…]</code> text; a raw <code style="font-family:var(--mono)">print -r</code>
+        won't interpret it. Materialize to real bytes first.</p>
+      </div>
+
+      <div>
+        <p class="cap">Selecting a theme</p>
+        <div class="term">
+          <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">colorscheme</span></div>
+<pre class="code"><span class="mu"># bridge your env var → Trove, at startup</span>
+: ${<span class="k">BESKAR_COLOR_SCHEME</span>:=monokai}
+trove_set_colorscheme "$BESKAR_COLOR_SCHEME"</pre>
+        </div>
+        <p class="use" style="font-size:.85rem">Reference roles, never hex — so every theme just works.
+        dotFiles bridges <code style="font-family:var(--mono)">DF_COLOR_SCHEME</code>, Beskar
+        <code style="font-family:var(--mono)">BESKAR_COLOR_SCHEME</code>.</p>
+        <div style="display:flex;gap:.45rem;flex-wrap:wrap;align-items:center;margin-top:.7rem">
+          <span style="font-family:var(--mono);font-size:.68rem;color:var(--muted)">Header purple, 5 themes:</span>
+          <span title="monokai" style="width:1.05rem;height:1.05rem;border-radius:4px;background:#af87ff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)"></span>
+          <span title="solarized" style="width:1.05rem;height:1.05rem;border-radius:4px;background:#af005f;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)"></span>
+          <span title="nord" style="width:1.05rem;height:1.05rem;border-radius:4px;background:#af87d7;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)"></span>
+          <span title="dracula" style="width:1.05rem;height:1.05rem;border-radius:4px;background:#bd93f9;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)"></span>
+          <span title="gruvbox" style="width:1.05rem;height:1.05rem;border-radius:4px;background:#d787af;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONFORMANCE -->
+  <section>
+    <div class="rule"><h2>Conformance Checklist</h2></div>
+    <p class="lead">Run any CLI against this. Each item is mechanical — pass or fail.</p>
+    <ul class="check">
+      <li><span>Section titles use <code>COL_BOLD_PURPLE</code>, not plain uppercase.</span></li>
+      <li><span>Keys/labels use <code>COL_CYAN</code>, aligned in a fixed-width column (<code>%-Ns</code>).</span></li>
+      <li><span>Ruled headings have <b>exactly one leading space</b> before the word.</span></li>
+      <li><span>Success / warning / error use green / yellow / red <em>and</em> the matching glyph.</span></li>
+      <li><span>Metadata, timestamps &amp; separators use <code>COL_GRAY</code>.</span></li>
+      <li><span>Full-command rows carry a muted <code>#</code> comment description; bare-token rows use plain text.</span></li>
+      <li><span><code>Library:</code>/<code>Registry:</code>/<code>Resolver:</code> pointers: Header label, cyan paths, plain functions, aligned <code>—</code>.</span></li>
+      <li><span><code>COL_*</code> materialized before a raw <code>print -r</code>; theme set via <code>trove_set_colorscheme</code>.</span></li>
+      <li><span>No raw <code>echo</code> for status — <code>trove_*</code> loggers only.</span></li>
+      <li><span>Color sits in an <code>echo</code> string or <code>printf</code> <em>format</em> position — never a <code>%s</code> argument.</span></li>
+      <li><span>Every colored span is closed with <code>COL_RESET</code>.</span></li>
+      <li><span>Colors referenced by role via <code>COL_*</code> — never a hardcoded <code>\033[…]</code> literal.</span></li>
+      <li><span><code>--json</code>/<code>--porcelain</code> emit no escape codes.</span></li>
+    </ul>
+  </section>
+
+  <!-- TWO DOCS -->
+  <section>
+    <div class="rule"><h2>Two Documents</h2></div>
+    <p class="lead">This page is the human half. The agent half is the same rules, stripped to
+    imperative lines a tool can apply and grade against — the future context file.</p>
+    <div class="docs">
+      <div class="doc">
+        <div class="who">for people</div>
+        <h3>style-guide</h3>
+        <p>The why and the feel — this visual reference. Palette rationale, examples, the philosophy that color encodes structure.</p>
+        <ul><li>Swatches &amp; roles</li><li>Before/after gallery</li><li>Design rationale</li></ul>
+      </div>
+      <div class="doc">
+        <div class="who">for agents</div>
+        <h3>STYLE.md · context</h3>
+        <p>Terse, imperative, gradeable. Dropped into any CLI repo so an agent builds and audits to spec without re-deriving it.</p>
+        <ul><li>Role → <code style="font-family:var(--mono)">COL_*</code> table</li><li>The conformance checklist</li><li>Do/don't code snippets</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    CLI Output Style Guide · draft v0 for review · generic across dotFiles · Beskar · Trove
+  </footer>
+</div>
+</body>
+</html>
