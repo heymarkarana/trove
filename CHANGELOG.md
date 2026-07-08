@@ -48,7 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged (native, live, separated streams).
 - **`TROVE_ENABLE_LOGGING=false`** now silences only the terminal; the file sink keeps
   recording (disable it with `TROVE_FILE_LOGGING=false`).
-- `docs/API.md`, `AGENTS.md`, `config/trove.conf` document the file sink.
+- `docs/API.md`, `AGENTS.md`, `README.md`, `config/trove.conf` document the file sink
+  (README/API version stamps bumped to 1.2.0; the `TROVE_ENABLE_LOGGING` description
+  corrected to "silences the terminal only").
 
 ### Notes
 - Minor release: existing terminal behavior and public-function contracts are preserved.

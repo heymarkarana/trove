@@ -273,11 +273,22 @@ plus these environment variables. Precedence: **env var > `config/trove.conf` >
 built-in default**.
 
 ```zsh
-export TROVE_LOG_LEVEL="INFO"        # TRACE DEBUG INFO WARN ERROR FATAL
+export TROVE_LOG_LEVEL="INFO"        # terminal level: TRACE DEBUG INFO WARN ERROR FATAL
 export TROVE_COLORSCHEME="monokai"   # monokai solarized nord dracula gruvbox
-export TROVE_OUTPUT_DISPLAY="true"   # show command output in trove_silent_run
-export TROVE_ENABLE_LOGGING="true"   # set false to silence ALL Trove output
+export TROVE_OUTPUT_DISPLAY="true"   # show trove_silent_run output live (else captured to file)
+export TROVE_ENABLE_LOGGING="true"   # set false to silence the TERMINAL (file sink keeps recording)
 export ATLAS_REGISTRY="/opt/.atlas/registry"   # registry path override (tests/dev)
+
+# Verbose file sink (always-on; see docs/API.md → Verbose File Sink):
+export TROVE_FILE_LOGGING="true"        # master switch for the file sink
+export TROVE_LOG_APP="trove"            # channel / app name (per-app logs)
+export TROVE_LOG_DIR=""                 # dir override (else XDG, or /var/log/trove/<app> as root)
+export TROVE_LOG_FILE_LEVEL="TRACE"     # floor for the file (independent of terminal level)
+export TROVE_LOG_RETENTION_DAYS="7"     # days of daily files to keep
+export TROVE_LOG_FORMAT="text"          # text | json
+export TROVE_LOG_SCRUB="true"           # redact secrets before writing
+export TROVE_LOG_SCRUB_PATTERNS=""      # extra ':'-separated ERE regexes to redact
+export TROVE_LOG_CAPTURE_TEE="true"     # capture live+file (true) or file-only (false)
 ```
 
 ---
