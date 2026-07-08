@@ -13,6 +13,8 @@ the foundation layer other tools build on — it has no dependencies of its own.
 - 🧭 **Atlas Discovery** — find where tools and instance config live, from any
   context (cron, systemd, root, another user), without relying on `$HOME`
 - 📝 **Structured Logging** — level-filtered logging with colored output
+- 🗄️ **Verbose File Logging** — always-on, per-app, secret-scrubbed log files with
+  retention; point a human or an LLM at them to troubleshoot (see `docs/API.md`)
 - 🎨 **Color Schemes** — Monokai, Solarized, Nord, Dracula, Gruvbox
 - 📊 **Monitoring Helpers** — system metrics for monitoring integrations
 - 🛠️ **Helpers** — path validation, portable stat, permission checks, platform detection

@@ -100,8 +100,28 @@ source "${TROVE_HOME}/lib/trove_logging.zsh"
 | `trove_running "msg"` | In-progress step indicator |
 | `trove_ok "msg"` | Success confirmation |
 | `trove_action "msg"` | User-input section header |
-| `trove_silent_run "cmd" "label"` | Execute command (no `eval`), log result |
-| `trove_set_logging_enabled false` | Silence all output (`TROVE_ENABLE_LOGGING`) |
+| `trove_silent_run "cmd" "label"` | Execute command (no `eval`), log result; suppressed output is captured to the file sink |
+| `trove_set_logging_enabled false` | Silence the TERMINAL (`TROVE_ENABLE_LOGGING`); the file sink keeps recording |
+
+#### Verbose file sink (always-on, v1.2.0+)
+
+A second sink writes a plain-text, timestamped, secret-scrubbed log **all the time**
+at full TRACE verbosity — independent of the terminal level and of
+`TROVE_ENABLE_LOGGING`. Per-app, per-actor files
+(`‹dir›/‹app›-‹user›-YYYY-MM-DD.log`, mode `600`); 7-day retention (configurable).
+
+| Function / CLI | Purpose |
+|---|---|
+| `TROVE_LOG_APP=beskar` | Select the channel (per app). Set in the app's own env/config |
+| `klog --app beskar INFO "msg"` | Log to the beskar channel from any language |
+| `klog --app beskar path` | Print the log file path (point an LLM/human here) |
+| `klog --app beskar tail [N]` / `prune` / `init` | Tail / apply retention / pre-create dir |
+| `trove_log_capture_begin` / `_end` | Capture ALL stdout+stderr of a region (opt-in) |
+| `trove_git …` | Run git through Trove so git/git-crypt activity is logged (scrubbed) |
+
+Key env vars: `TROVE_FILE_LOGGING`, `TROVE_LOG_DIR`, `TROVE_LOG_FILE_LEVEL`,
+`TROVE_LOG_RETENTION_DAYS`, `TROVE_LOG_FORMAT` (text|json), `TROVE_LOG_SCRUB`. See
+`docs/API.md` (Verbose File Sink) and `docs/migrations/1.2.0.md`.
 
 ### Helpers (`trove_helpers.zsh`)
 

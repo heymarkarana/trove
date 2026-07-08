@@ -507,6 +507,31 @@ trove_git_prefer_ssh() {
     return 0
 }
 
+# trove_git [git-args…] — run git through Trove so the command line and its
+# combined output are recorded in the verbose file sink (at DEBUG), with secret
+# scrubbing applied (credential-in-URL, tokens). Returns git's exit code. Honors
+# TROVE_GIT_BIN. Terminal behavior mirrors trove_silent_run: with
+# TROVE_OUTPUT_DISPLAY=true git's native/live output is shown; otherwise it is
+# captured to the file only. Use this (or trove_log_capture_begin/end) so git and
+# git-crypt activity lands in the log.
+#
+# git-crypt SECURITY: log OPERATIONS only. Never pipe decrypted file contents
+# through trove_git; `trove_git crypt status/lock/unlock` records the command and
+# result, and the scrubber catches stray key/credential bytes — but decrypted
+# plaintext must never be handed to the logger.
+trove_git() {
+    emulate -L zsh
+    local git="${TROVE_GIT_BIN:-git}"
+    if (( ${+functions[trove_silent_run]} == 0 )); then
+        # Logging core not loaded — fall back to a plain, unlogged git call.
+        "$git" "$@"
+        return $?
+    fi
+    # Build a display string for the log; run via the injection-safe argv path.
+    local shown="${git} ${(j: :)${(q)@}}"
+    trove_silent_run "$shown" "git ${1:-}" DEBUG
+}
+
 ###############################################################################
 # Initialization
 ###############################################################################

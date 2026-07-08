@@ -26,11 +26,15 @@ show_help() {
 klog - Trove Logging CLI
 
 Usage:
-  klog LEVEL "message"        Log a message at specified level
-  klog bot "message"          Major section header
-  klog running "message"      Configuration step
-  klog ok "message"           Success confirmation
-  klog --help                 Show this help
+  klog [--app NAME] LEVEL "message"   Log a message at specified level
+  klog [--app NAME] bot "message"     Major section header
+  klog [--app NAME] running "message" Configuration step
+  klog [--app NAME] ok "message"      Success confirmation
+  klog [--app NAME] path              Print today's verbose log file path
+  klog [--app NAME] tail [N]          Tail the verbose log file (default 50 lines)
+  klog [--app NAME] prune             Delete daily files older than retention
+  klog [--app NAME] init              Create the channel dir; print its paths
+  klog --help                         Show this help
 
 Log Levels:
   TRACE   - Very detailed debugging
@@ -45,23 +49,37 @@ Special Commands:
   running  - Configuration step (orange ✨)
   ok       - Success indicator (green ➤)
 
+File-sink Commands (the always-on verbose log):
+  path     - Print the resolved log file path (point an LLM/human here)
+  tail     - Show the tail of the current channel's log
+  prune    - Apply retention now (also good as a periodic cron for dormant channels)
+  init     - Pre-create the channel directory and print dir + file paths
+
 Examples:
   klog INFO "Application started"
-  klog ERROR "Connection failed"
-  klog bot "Installing Packages"
-  klog running "Configuring database"
-  klog ok "Installation complete"
+  klog --app beskar ERROR "Connection failed"
+  klog --app beskar init
+  klog --app beskar path
+  TROVE_LOG_DIR=/var/log/beskar klog --app beskar INFO "cron sync ran"
 
 Environment Variables:
-  TROVE_LOG_LEVEL         - Log level filter (default: INFO)
-  TROVE_OUTPUT_DISPLAY    - Show command output (default: true)
-  TROVE_COLORSCHEME       - Color scheme (default: monokai)
+  TROVE_LOG_LEVEL          - Terminal log level filter (default: INFO)
+  TROVE_OUTPUT_DISPLAY     - Show command output (default: true)
+  TROVE_COLORSCHEME        - Color scheme (default: monokai)
+  TROVE_FILE_LOGGING       - Master switch for the verbose file sink (default: true)
+  TROVE_LOG_APP            - Channel/app name (or use --app; default: trove)
+  TROVE_LOG_DIR            - Override log dir (default: per-user XDG or /var/log)
+  TROVE_LOG_FILE_LEVEL     - Floor for the file (default: TRACE = everything)
+  TROVE_LOG_RETENTION_DAYS - Days of daily files to keep (default: 7)
+  TROVE_LOG_FORMAT         - text (default) | json
+  TROVE_LOG_SCRUB          - Redact secrets before writing (default: true)
+  TROVE_LOG_SCRUB_PATTERNS - Extra ':'-separated ERE regexes to redact
 
 Exit Codes:
   0 - Success
   1 - Invalid usage or error
 
-For more information: /opt/trove/docs/API.md
+For more information: \${TROVE_HOME}/docs/API.md
 EOF
 }
 
@@ -75,6 +93,15 @@ main() {
         show_help
         exit 0
     fi
+
+    # Optional leading channel selector: --app NAME (equivalent to TROVE_LOG_APP).
+    if [[ "$1" == "--app" ]]; then
+        [[ -n "$2" ]] || { echo "ERROR: --app requires a channel name" >&2; exit 1; }
+        export TROVE_LOG_APP="$2"
+        shift 2
+    fi
+
+    [[ "$#" -ge 1 ]] || { show_help; exit 0; }
 
     # Get command/level
     local command="$1"
@@ -93,6 +120,25 @@ main() {
             ;;
         ok)
             trove_ok "$message"
+            ;;
+        path)
+            trove_log_file_path
+            ;;
+        tail)
+            trove_log_tail "${1:-50}"
+            ;;
+        prune)
+            trove_log_prune
+            ;;
+        init)
+            # Pre-create the channel directory with safe perms; print its paths so
+            # the app can record them in its own config.
+            local dir; dir="$(trove_log_dir)"
+            ( umask 077; mkdir -p "$dir" ) 2>/dev/null
+            [[ $EUID -eq 0 && -n "$dir" ]] && chmod 0755 "$dir" 2>/dev/null  # /var/log dir readable
+            echo "channel: ${TROVE_LOG_APP:-trove}"
+            echo "dir:     ${dir}"
+            echo "file:    $(trove_log_file_path)"
             ;;
         TRACE|DEBUG|INFO|WARN|ERROR|FATAL)
             trove_log "$command" "$message"

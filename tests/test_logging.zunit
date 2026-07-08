@@ -6,6 +6,10 @@
 
   # Silence output for cleaner test results
   export TROVE_DISPLAY_OUTPUT=0
+
+  # Isolate the v1.2.0 file sink: these tests only assert TERMINAL behavior, so
+  # keep them from writing to the user's real XDG log dir.
+  export TROVE_FILE_LOGGING=false
 }
 
 @teardown {
