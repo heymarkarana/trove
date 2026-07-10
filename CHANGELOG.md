@@ -5,6 +5,15 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Disk-metric helpers were broken by a `$PATH`-shadow footgun.**
+  `trove_get_disk_{usage,used_gb,total_gb,available_gb}` declared `local path=…` —
+  but `path` is the array tied to `$PATH`, so inside the function `$PATH` collapsed to
+  the argument and `df`/`awk`/`sed` were "command not found" (the helpers silently
+  returned empty). Renamed the local to `dir`. (`lib/trove_monitoring.zsh`.)
+
 ## [1.2.0] - 2026-07-08
 
 ### Added

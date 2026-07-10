@@ -16,32 +16,32 @@
 # Usage: usage=$(trove_get_disk_usage "/")
 # Returns: Percentage (e.g., "45")
 trove_get_disk_usage() {
-    local path="${1:-.}"
-    df -h "$path" 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//'
+    local dir="${1:-.}"
+    df -h "$dir" 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//'
 }
 
 # Get disk usage in GB
 # Usage: used=$(trove_get_disk_used_gb "/")
 # Returns: Used space in GB (e.g., "42.5")
 trove_get_disk_used_gb() {
-    local path="${1:-.}"
-    df -BG "$path" 2>/dev/null | awk 'NR==2 {print $3}' | sed 's/G//'
+    local dir="${1:-.}"
+    df -BG "$dir" 2>/dev/null | awk 'NR==2 {print $3}' | sed 's/G//'
 }
 
 # Get disk total in GB
 # Usage: total=$(trove_get_disk_total_gb "/")
 # Returns: Total space in GB (e.g., "100.0")
 trove_get_disk_total_gb() {
-    local path="${1:-.}"
-    df -BG "$path" 2>/dev/null | awk 'NR==2 {print $2}' | sed 's/G//'
+    local dir="${1:-.}"
+    df -BG "$dir" 2>/dev/null | awk 'NR==2 {print $2}' | sed 's/G//'
 }
 
 # Get disk available in GB
 # Usage: avail=$(trove_get_disk_available_gb "/")
 # Returns: Available space in GB (e.g., "57.5")
 trove_get_disk_available_gb() {
-    local path="${1:-.}"
-    df -BG "$path" 2>/dev/null | awk 'NR==2 {print $4}' | sed 's/G//'
+    local dir="${1:-.}"
+    df -BG "$dir" 2>/dev/null | awk 'NR==2 {print $4}' | sed 's/G//'
 }
 
 ###############################################################################
