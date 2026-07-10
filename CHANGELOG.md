@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`TROVE_VERSION`** — the root `VERSION` file is now read at runtime in
+  `lib/trove_init.zsh` and exported (single source of truth; D002).
+- **`DECISIONS.md`** — decision log (`D001`–`D009`) backfilling the standing
+  base-tier decisions; **`docs/INDEX.md`** + **`docs/features/INDEX.md`** catalog.
+- **Static-gate tools** — `tools/lint-zsh-syntax.sh` (`zsh -n` over `bin/`+`lib/`)
+  and `tools/lint-zsh-locals.sh` (combined-`local` footgun gate; D009).
+
+### Changed
+- **`CLAUDE.md` is now a symlink to `AGENTS.md`** (D004) — one source of truth,
+  replacing the interim markdown stub.
+
 ### Fixed
 - **Disk-metric helpers were broken by a `$PATH`-shadow footgun.**
   `trove_get_disk_{usage,used_gb,total_gb,available_gb}` declared `local path=…` —
