@@ -2,7 +2,7 @@
 
 # Trove API Reference
 
-Complete API documentation for Trove v1.0.0
+Complete API documentation for Trove v1.2.0
 
 > CLI facades `klog`, `kreq`, and `atlas-env` are **zsh scripts**, not compiled
 > binaries.
@@ -13,6 +13,7 @@ Complete API documentation for Trove v1.0.0
 
 - [Atlas Discovery](#atlas-discovery)
 - [Logging Functions](#logging-functions)
+- [Verbose File Sink](#verbose-file-sink)
 - [Color Management](#color-management)
 - [Helper Utilities](#helper-utilities)
 - [Monitoring Functions](#monitoring-functions)
@@ -160,6 +161,13 @@ trove_silent_run "brew install git" "Installing git" INFO
 
 **Returns**: Command's exit code
 
+> **v1.2.0 behavior change:** the command line and its output are recorded to the
+> [verbose file sink](#verbose-file-sink). With `TROVE_OUTPUT_DISPLAY=true` the
+> command still runs with its native, live, separated stdout/stderr on the terminal
+> (unchanged); with `TROVE_OUTPUT_DISPLAY=false` the output is no longer discarded to
+> `/dev/null` — it is captured to the log file. For full capture of a *display-on*
+> command's output, wrap it in `trove_log_capture_begin` / `trove_log_capture_end`.
+
 ---
 
 ### Result Printing
@@ -216,6 +224,95 @@ trove_set_output_display false  # Suppress output
 trove_silent_run "noisy-command" "Running silently"
 trove_set_output_display true   # Re-enable
 ```
+
+---
+
+## Verbose File Sink
+
+New in **v1.2.0**. A second, independent output target that **always** records at
+full verbosity — plain text, timestamped, ANSI-stripped, secret-scrubbed — no
+matter what the terminal shows, and even when `TROVE_ENABLE_LOGGING=false` silences
+the terminal. It exists so a human or an LLM can be pointed at a complete trace for
+troubleshooting.
+
+### Model
+
+- **Two sinks.** The terminal sink is unchanged (stderr, colored, filtered by
+  `TROVE_LOG_LEVEL`). The file sink is separate: gated only by `TROVE_FILE_LOGGING`
+  and a `TROVE_LOG_FILE_LEVEL` floor (default `TRACE` = everything), written from the
+  raw message before color and before the terminal filter.
+- **Per-app, per-actor files.** An app selects its channel with `TROVE_LOG_APP`;
+  each writer gets its own file `‹dir›/‹app›-‹euser›-YYYY-MM-DD.log` at mode `600`,
+  owned by the writer (`‹euser›` is the **effective** user, `id -un`) — so logs are
+  never shared or leaked across users, including root/cron write-on-behalf. Every
+  line also records both identities: the real user (`actor=`) and effective
+  (`euid=`), which diverge under `sudo` (e.g. filename `app-root-…`, line
+  `actor=alice euid=root`).
+- **Location.** `TROVE_LOG_DIR` if set; else per-user XDG
+  (`${XDG_STATE_HOME:-~/.local/state}/trove/logs/‹app›`) for normal users, or
+  `/var/log/trove/‹app›` when running as root.
+- **Retention.** Daily files older than `TROVE_LOG_RETENTION_DAYS` (default 7) are
+  pruned automatically when a new day's file is first created; run `klog prune`
+  (e.g. from cron) to clean fully-dormant or shared channels.
+- **Secret scrubbing.** On by default (`TROVE_LOG_SCRUB`). Masks AWS/GitHub/Slack/
+  Google/JWT token shapes, `sensitive_key=value`, and credentials embedded in URLs,
+  revealing at most a 4-char prefix. Defense-in-depth, not a guarantee.
+
+### Functions
+
+#### `trove_log_file_path` / `trove_log_dir`
+Print today's resolved log file path / the channel directory.
+
+#### `trove_log_tail [N]`
+Tail the current channel's log file (default 50 lines).
+
+#### `trove_log_prune`
+Apply retention now (delete daily files older than `TROVE_LOG_RETENTION_DAYS`).
+
+#### `trove_scrub "text"`
+Return `text` with secrets redacted — useful to pre-scrub a string before logging.
+
+#### `trove_log_capture_begin` / `trove_log_capture_end`
+Bracket a region whose **entire** stdout+stderr — including raw `echo`/`printf` and
+subcommand output not routed through Trove — is captured to the file (timestamped
+and scrubbed). Default tees live to the terminal too; set `TROVE_LOG_CAPTURE_TEE=false`
+for file-only. Fully drained before `_end` returns (no lost tail). Opt-in only — it
+is never auto-enabled. For exit-safety install a top-level trap:
+
+```bash
+trove_log_capture_begin
+trap 'trove_log_capture_end' EXIT
+# … arbitrary script output, all captured …
+trove_log_capture_end
+```
+
+#### `trove_git [git-args…]`  *(optional module: `trove_load helpers`)*
+Run git through Trove so the command line + output are logged (scrubbed) — the
+recommended way to capture git and git-crypt activity. **git-crypt: operations only —
+never pipe decrypted content through the logger.**
+
+### `klog` file-sink subcommands
+
+```bash
+klog [--app NAME] path        # print today's log file path
+klog [--app NAME] tail [N]    # tail the log
+klog [--app NAME] prune       # apply retention now
+klog [--app NAME] init        # pre-create the channel dir; print dir + file paths
+```
+
+### Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TROVE_FILE_LOGGING` | `true` | Master switch for the file sink |
+| `TROVE_LOG_APP` | `trove` | Channel / application name |
+| `TROVE_LOG_DIR` | *(empty)* | Dir override (else XDG or `/var/log`) |
+| `TROVE_LOG_FILE_LEVEL` | `TRACE` | Floor for the file (independent of terminal) |
+| `TROVE_LOG_RETENTION_DAYS` | `7` | Days of daily files to keep |
+| `TROVE_LOG_FORMAT` | `text` | `text` or `json` |
+| `TROVE_LOG_SCRUB` | `true` | Redact secrets before writing |
+| `TROVE_LOG_SCRUB_PATTERNS` | *(empty)* | Extra `:`-separated ERE regexes |
+| `TROVE_LOG_CAPTURE_TEE` | `true` | Capture live+file (`true`) or file-only |
 
 ---
 
@@ -1028,5 +1125,5 @@ func main() {
 
 ---
 
-**Version**: 1.0.0
-**Last Updated**: 2026-06-16
+**Version**: 1.2.0
+**Last Updated**: 2026-07-08

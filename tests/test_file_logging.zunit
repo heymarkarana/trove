@@ -1,0 +1,182 @@
+#!/usr/bin/env zunit
+
+@setup {
+  source "${TROVE_HOME}/lib/trove_logging.zsh"
+
+  # Hermetic: a fresh temp dir per test process; never the real XDG dir.
+  export TROVE_LOG_DIR="$(mktemp -d)"
+  export TROVE_LOG_APP="ziltest"
+  export TROVE_FILE_LOGGING=true
+  export TROVE_LOG_SCRUB=true
+  export TROVE_LOG_FORMAT=text
+  export TROVE_LOG_CAPTURE_TEE=true
+  # Default terminal level is already INFO after sourcing; do NOT call
+  # trove_set_log_level here — it would emit a DEBUG line and create the log file
+  # during setup, defeating the TROVE_FILE_LOGGING=false test.
+  export TROVE_LOG_LEVEL=INFO
+}
+
+@teardown {
+  [[ -n "$TROVE_LOG_DIR" && -d "$TROVE_LOG_DIR" ]] && rm -rf "$TROVE_LOG_DIR"
+}
+
+@test 'file records TRACE even when terminal level is INFO' {
+  # Terminal is INFO; a TRACE message must be absent from stderr but present in the file.
+  run trove_log TRACE "deep-trace-detail"
+  assert "$output" is_empty
+
+  local f="$(trove_log_file_path)"
+  assert "$f" is_file
+  run cat "$f"
+  assert "$output" contains "deep-trace-detail"
+  assert "$output" contains "[TRACE]"
+}
+
+@test 'file line is plain text: no ANSI, has ISO timestamp and level' {
+  trove_log INFO "plain-line-check" 2>/dev/null
+  local f="$(trove_log_file_path)"
+  run cat "$f"
+  assert "$output" contains "plain-line-check"
+  # No ESC character in the file
+  run grep -c $'\x1b' "$f"
+  assert "$output" same_as '0'
+  # ISO-ish timestamp at the start of a line
+  run grep -cE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' "$f"
+  assert "$state" equals 0
+}
+
+@test 'master-off (TROVE_ENABLE_LOGGING=false) still writes the file' {
+  trove_set_logging_enabled false
+  run trove_log INFO "audit-when-silent"
+  trove_set_logging_enabled true
+  assert "$output" is_empty
+
+  run cat "$(trove_log_file_path)"
+  assert "$output" contains "audit-when-silent"
+}
+
+@test 'TROVE_FILE_LOGGING=false writes no file' {
+  export TROVE_FILE_LOGGING=false
+  trove_log INFO "should-not-persist" 2>/dev/null
+  local f="$(trove_log_file_path)"
+  run test ! -e "$f"      # exits 0 only if the file was NOT created
+  assert $state equals 0
+}
+
+@test 'per-app path and filename contain the channel and actor' {
+  export TROVE_LOG_APP=beskar
+  local f="$(trove_log_file_path)"
+  assert "$f" contains "beskar-"
+  # actor (current user) is in the filename
+  assert "$f" contains "$(id -un)"
+}
+
+@test 'file mode is 600' {
+  trove_log INFO "mode-check" 2>/dev/null
+  local f="$(trove_log_file_path)"
+  # portable perm read (BSD vs GNU)
+  local mode
+  if stat -f '%Lp' "$f" >/dev/null 2>&1; then mode="$(stat -f '%Lp' "$f")"; else mode="$(stat -c '%a' "$f")"; fi
+  assert "$mode" same_as '600'
+}
+
+@test 'line carries actor and euid attribution' {
+  trove_log INFO "attrib-check" 2>/dev/null
+  run cat "$(trove_log_file_path)"
+  assert "$output" contains "actor="
+  assert "$output" contains "euid="
+}
+
+@test 'trove_silent_run display OFF captures suppressed output to file' {
+  export TROVE_OUTPUT_DISPLAY=false
+  trove_set_output_display false >/dev/null 2>&1
+  run trove_silent_run "echo hidden-payload" "ran echo" DEBUG
+  # Nothing on stdout/stderr (suppressed)
+  assert "$output" does_not_contain "hidden-payload"
+  # But it IS in the file
+  run cat "$(trove_log_file_path)"
+  assert "$output" contains "hidden-payload"
+}
+
+@test 'scrubber masks tokens, key=value and URL credentials' {
+  run trove_scrub "token=ghp_ABCDEFGHIJKLMNOPQRSTUV url https://u:supersecretpw@github.com password=hunter2secretlong"
+  assert "$output" contains "ghp_***"
+  assert "$output" does_not_contain "ghp_ABCDEFGHIJKLMNOPQRSTUV"
+  assert "$output" does_not_contain "supersecretpw"
+  assert "$output" does_not_contain "hunter2secretlong"
+}
+
+@test 'scrubber is case-insensitive for capitalized keys' {
+  run trove_scrub "API_KEY=abcdef1234567890xyz Password=SuperSecretValue123"
+  assert "$output" does_not_contain "abcdef1234567890xyz"
+  assert "$output" does_not_contain "SuperSecretValue123"
+}
+
+@test 'scrubber masks quoted values' {
+  run trove_scrub "password=\"hunter2secretlong\" note ok"
+  assert "$output" does_not_contain "hunter2secretlong"
+  assert "$output" contains '***'
+}
+
+@test 'scrubber masks the token after an Authorization scheme word' {
+  run trove_scrub "Authorization: Bearer opaqueTokenValue123456"
+  assert "$output" does_not_contain "opaqueTokenValue123456"
+}
+
+@test 'TROVE_LOG_SCRUB=false leaves values intact' {
+  export TROVE_LOG_SCRUB=false
+  run trove_scrub "token=ghp_ABCDEFGHIJKLMNOPQRSTUV"
+  assert "$output" contains "ghp_ABCDEFGHIJKLMNOPQRSTUV"
+}
+
+@test 'retention prunes daily files older than N days' {
+  local d="$TROVE_LOG_DIR"
+  # backdate an old file and create a recent one (BSD/GNU touch -t)
+  touch -t 202601010000 "$d/ziltest-$(id -un)-2026-01-01.log"
+  touch "$d/ziltest-$(id -un)-2026-07-08.log"
+  export TROVE_LOG_RETENTION_DAYS=7
+  trove_log_prune
+  run zsh -c "ls '$d'"
+  assert "$output" does_not_contain "2026-01-01"
+  assert "$output" contains "2026-07-08"
+}
+
+@test 'whole-process capture records the full region including the tail' {
+  trove_log_capture_begin
+  local i
+  for i in {1..500}; do print -r -- "cap-line-$i"; done
+  print -r -- "cap-tail-marker"
+  trove_log_capture_end
+
+  run cat "$(trove_log_file_path)"
+  assert "$output" contains "cap-line-1"
+  assert "$output" contains "cap-line-500"
+  assert "$output" contains "cap-tail-marker"
+}
+
+@test 'capture file-only mode (no tee) still scrubs and timestamps' {
+  export TROVE_LOG_CAPTURE_TEE=false
+  trove_log_capture_begin
+  print -r -- "sync secret token=ghp_ABCDEFGHIJKLMNOPQRSTUV"
+  trove_log_capture_end
+
+  run cat "$(trove_log_file_path)"
+  assert "$output" contains "ghp_***"
+  assert "$output" contains "[OUT"
+}
+
+@test 'json format emits one object per line' {
+  export TROVE_LOG_FORMAT=json
+  trove_log INFO "json-line" 2>/dev/null
+  local f="$(trove_log_file_path)"
+  run cat "$f"
+  assert "$output" contains '"level":"INFO"'
+  assert "$output" contains '"msg":"json-line"'
+  assert "$output" contains '"app":"ziltest"'
+}
+
+@test 'klog path prints the resolved file path' {
+  run "${TROVE_HOME}/bin/klog" --app ziltest path
+  assert "$state" equals 0
+  assert "$output" contains "ziltest-"
+}

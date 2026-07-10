@@ -1,6 +1,6 @@
 # Trove — Shared Utilities Library
 
-**Version**: 1.0.0
+**Version**: 1.2.0
 
 A collection of reusable zsh utilities: structured logging, color schemes,
 discovery (Atlas), monitoring helpers, and common path/system helpers. Trove is
@@ -13,6 +13,8 @@ the foundation layer other tools build on — it has no dependencies of its own.
 - 🧭 **Atlas Discovery** — find where tools and instance config live, from any
   context (cron, systemd, root, another user), without relying on `$HOME`
 - 📝 **Structured Logging** — level-filtered logging with colored output
+- 🗄️ **Verbose File Logging** — always-on, per-app, secret-scrubbed log files with
+  retention; point a human or an LLM at them to troubleshoot (see `docs/API.md`)
 - 🎨 **Color Schemes** — Monokai, Solarized, Nord, Dracula, Gruvbox
 - 📊 **Monitoring Helpers** — system metrics for monitoring integrations
 - 🛠️ **Helpers** — path validation, portable stat, permission checks, platform detection
@@ -96,10 +98,10 @@ eval "$(atlas-env)"        # export ATLAS_* discovery values (cron/system safe)
 
 | Module | Loaded | Provides |
 |---|---|---|
-| `trove_logging.zsh` | core (auto) | `trove_log`, `trove_error`, `trove_ok`, `trove_bot`, `trove_running`, `trove_action`, `trove_silent_run`, level + display + on/off config |
+| `trove_logging.zsh` | core (auto) | `trove_log`, `trove_error`, `trove_ok`, `trove_bot`, `trove_running`, `trove_action`, `trove_silent_run`, level + display + on/off config; **always-on verbose file sink** (`trove_log_file_path/dir/prune/tail`, `trove_scrub`, `trove_log_capture_begin/end`) |
 | `trove_colors.zsh` | core (auto) | `trove_set_colorscheme`, `trove_get_colorscheme`, `trove_show_colorschemes`, the `COL_*` globals (every scheme exported globally) |
 | `trove_atlas.zsh` | core (auto) | `trove_atlas_get/require/tool/set/unset/dump/sync` — discovery reader |
-| `trove_helpers.zsh` | `trove_load helpers` | path validation, permission checks, `trove_stat_owner/group/mode`, platform detection, env + string helpers |
+| `trove_helpers.zsh` | `trove_load helpers` | path validation, permission checks, `trove_stat_owner/group/mode`, platform detection, env + string helpers, `trove_git` (logged git/git-crypt) |
 | `trove_date.zsh` | `trove_load date` | timestamps, date arithmetic, durations |
 | `trove_monitoring.zsh` | `trove_load monitoring` | disk/memory/CPU metrics, metric sender |
 | `trove_requirements.zsh` | `trove_load requirements` | dependency checking + version helpers |
@@ -143,11 +145,25 @@ built-in default**. Delete `trove.conf` to configure purely by environment.
 | Variable | Default | Purpose |
 |---|---|---|
 | `TROVE_HOME` | script location | Trove install dir (canonical; `TROVE_PATH` is a deprecated read-only alias) |
-| `TROVE_LOG_LEVEL` | `INFO` | `TRACE`/`DEBUG`/`INFO`/`WARN`/`ERROR`/`FATAL` |
+| `TROVE_LOG_LEVEL` | `INFO` | terminal log level: `TRACE`/`DEBUG`/`INFO`/`WARN`/`ERROR`/`FATAL` |
 | `TROVE_COLORSCHEME` | `monokai` | `monokai`/`solarized`/`nord`/`dracula`/`gruvbox` |
-| `TROVE_OUTPUT_DISPLAY` | `true` | show command output in `trove_silent_run` |
-| `TROVE_ENABLE_LOGGING` | `true` | set `false` to silence **all** Trove output |
+| `TROVE_OUTPUT_DISPLAY` | `true` | show `trove_silent_run` output live (else it's captured to the file sink) |
+| `TROVE_ENABLE_LOGGING` | `true` | set `false` to silence the **terminal** (the file sink keeps recording) |
 | `ATLAS_REGISTRY` | `/opt/.atlas/registry` | registry path override (tests/dev) |
+
+**Verbose file sink** (always-on; see [docs/API.md](docs/API.md) → Verbose File Sink):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TROVE_FILE_LOGGING` | `true` | master switch for the file sink |
+| `TROVE_LOG_APP` | `trove` | channel / application name (per-app logs) |
+| `TROVE_LOG_DIR` | *(empty)* | dir override (else per-user XDG, or `/var/log/trove/‹app›` as root) |
+| `TROVE_LOG_FILE_LEVEL` | `TRACE` | floor for the file (independent of the terminal level) |
+| `TROVE_LOG_RETENTION_DAYS` | `7` | days of daily files to keep |
+| `TROVE_LOG_FORMAT` | `text` | `text` or `json` |
+| `TROVE_LOG_SCRUB` | `true` | redact secrets before writing |
+| `TROVE_LOG_SCRUB_PATTERNS` | *(empty)* | extra `:`-separated ERE regexes to redact |
+| `TROVE_LOG_CAPTURE_TEE` | `true` | capture live+file (`true`) or file-only (`false`) |
 
 These can also be set at runtime: `trove_set_log_level`, `trove_set_colorscheme`,
 `trove_set_output_display`, `trove_set_logging_enabled`.

@@ -5,6 +5,67 @@ All notable changes to Trove will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Disk-metric helpers were broken by a `$PATH`-shadow footgun.**
+  `trove_get_disk_{usage,used_gb,total_gb,available_gb}` declared `local path=…` —
+  but `path` is the array tied to `$PATH`, so inside the function `$PATH` collapsed to
+  the argument and `df`/`awk`/`sed` were "command not found" (the helpers silently
+  returned empty). Renamed the local to `dir`. (`lib/trove_monitoring.zsh`.)
+
+## [1.2.0] - 2026-07-08
+
+### Added
+- **Always-on verbose file logging** — a second, independent output sink
+  (`lib/trove_logging.zsh`) that always records at full `TRACE` verbosity in plain
+  text, timestamped, ANSI-stripped, and secret-scrubbed, regardless of the terminal
+  log level and even when `TROVE_ENABLE_LOGGING=false` silences the terminal. Point a
+  human or an LLM at these files to troubleshoot.
+  - **Per-app, per-actor files:** channel via `TROVE_LOG_APP`; each writer gets its
+    own `‹dir›/‹app›-‹euser›-YYYY-MM-DD.log` (effective user) at mode `600` (no
+    cross-user sharing/leak, including root/cron write-on-behalf). Every line records
+    both the real (`actor=`) and effective (`euid=`) identity.
+  - **Location:** `TROVE_LOG_DIR`, else per-user XDG state, else `/var/log/trove/‹app›`
+    when running as root.
+  - **Retention:** `TROVE_LOG_RETENTION_DAYS` (default 7), pruned on new-day file
+    creation and via `klog prune`.
+  - **Secret scrubbing:** on by default (`TROVE_LOG_SCRUB`) — masks AWS/GitHub/Slack/
+    Google/JWT tokens, `sensitive_key=value`, and URL-embedded credentials.
+  - **Formats:** `TROVE_LOG_FORMAT=text` (default) or `json`.
+- **`trove_log_capture_begin` / `trove_log_capture_end`** — opt-in wrapper capturing a
+  region's entire stdout+stderr (including non-Trove output) to the file, live-tee'd to
+  the terminal and fully drained before returning (fixes the classic lost-tail bug via a
+  FIFO + waitable background writer).
+- **New public API:** `trove_log_file_path`, `trove_log_dir`, `trove_log_prune`,
+  `trove_log_tail`, `trove_scrub`.
+- **`trove_git`** (`lib/trove_helpers.zsh`) — run git through Trove so git/git-crypt
+  activity is logged and scrubbed (operations only; never decrypted content).
+- **`klog` subcommands:** `--app NAME`, `path`, `tail [N]`, `prune`, `init`.
+- **New config keys** in `config/trove.conf`: `TROVE_FILE_LOGGING`, `TROVE_LOG_APP`,
+  `TROVE_LOG_DIR`, `TROVE_LOG_FILE_LEVEL`, `TROVE_LOG_RETENTION_DAYS`,
+  `TROVE_LOG_FORMAT`, `TROVE_LOG_SCRUB`, `TROVE_LOG_SCRUB_PATTERNS`,
+  `TROVE_LOG_CAPTURE_TEE`.
+- **Reusable review agents** (`.claude/agents/`): `architecture-review`,
+  `docs-parity-review`.
+- **`docs/migrations/1.2.0.md`** — migration notes + a paste-in agent prompt for
+  downstream apps (dotFiles, Beskar) to self-adapt.
+
+### Changed
+- **`trove_silent_run`**: with `TROVE_OUTPUT_DISPLAY=false`, suppressed command output
+  is now **captured to the file sink** instead of `/dev/null`. Display-on behavior is
+  unchanged (native, live, separated streams).
+- **`TROVE_ENABLE_LOGGING=false`** now silences only the terminal; the file sink keeps
+  recording (disable it with `TROVE_FILE_LOGGING=false`).
+- `docs/API.md`, `AGENTS.md`, `README.md`, `config/trove.conf` document the file sink
+  (README/API version stamps bumped to 1.2.0; the `TROVE_ENABLE_LOGGING` description
+  corrected to "silences the terminal only").
+
+### Notes
+- Minor release: existing terminal behavior and public-function contracts are preserved.
+  See `docs/migrations/1.2.0.md` for the two behavioral changes and the downstream
+  checklist. File sink requires zsh ≥ 5.3 (degrades gracefully otherwise).
+
 ## [1.1.1] - 2026-07-04
 
 ### Added
