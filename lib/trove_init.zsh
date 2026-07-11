@@ -9,6 +9,18 @@
 TROVE_HOME="${0:A:h:h}"
 
 ###############################################################################
+# Version
+###############################################################################
+# Single source of truth: the root VERSION file, read at runtime (never a
+# hardcoded literal). Consumers read $TROVE_VERSION; exported so subprocess
+# facades (klog/kreq) and other-language callers can read it too.
+if [[ -r "${TROVE_HOME}/VERSION" ]]; then
+    TROVE_VERSION="$(<"${TROVE_HOME}/VERSION")"
+    TROVE_VERSION="${TROVE_VERSION//[[:space:]]/}"
+    export TROVE_VERSION
+fi
+
+###############################################################################
 # Environment Configuration
 ###############################################################################
 # Set environment defaults (respect existing values)

@@ -1,6 +1,6 @@
 # Trove — agent entry
 
-This file is the authoritative context for AI assistants working in this repository. `CLAUDE.md` references this file for Claude Code.
+This file is the authoritative context for AI assistants working in this repository. `CLAUDE.md` is a symlink to this file for Claude Code (see `DECISIONS.md` D004) — there is one source of truth, never a separate copy.
 
 ---
 
