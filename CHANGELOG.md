@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   base-tier decisions; **`docs/INDEX.md`** + **`docs/features/INDEX.md`** catalog.
 - **Static-gate tools** — `tools/lint-zsh-syntax.sh` (`zsh -n` over `bin/`+`lib/`)
   and `tools/lint-zsh-locals.sh` (combined-`local` footgun gate; D009).
+- **`tools/identity-scrub.sh` moved here from dotFiles** — Trove is the base tier,
+  so the cross-repo identity gate now lives with the other shared tools; dotFiles
+  and Beskar invoke it via `--root <dir>`. The forbidden-literal list default
+  changed from `<parent>/.scrub-literals` to
+  `<install_root>/dotFiles-config/shared/scrub-literals` (git-crypt encrypted in
+  the config-backup repo), resolved through Atlas via `bin/atlas-env`;
+  `SCRUB_LITERALS_FILE` still overrides. Also fixed a bash 3.2 `set -u` abort
+  when a literal kind (literal/substring/pattern) has no entries.
 
 ### Changed
 - **`CLAUDE.md` is now a symlink to `AGENTS.md`** (D004) — one source of truth,
