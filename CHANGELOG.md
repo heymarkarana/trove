@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replacing the interim markdown stub.
 
 ### Fixed
+- **`config/trove.conf` could not change `TROVE_LOG_LEVEL`, `TROVE_COLORSCHEME`,
+  or `TROVE_OUTPUT_DISPLAY`.** `lib/trove_init.zsh` applied its built-in defaults
+  for these three vars *before* sourcing the config file, so the conf's
+  `: ${VAR:=…}` lines were dead no-ops. The defaults block now runs after the
+  config source, restoring the documented precedence
+  (env var > config file > built-in default). Regression tests in
+  `tests/test_integration.zunit`.
 - **Disk-metric helpers were broken by a `$PATH`-shadow footgun.**
   `trove_get_disk_{usage,used_gb,total_gb,available_gb}` declared `local path=…` —
   but `path` is the array tied to `$PATH`, so inside the function `$PATH` collapsed to

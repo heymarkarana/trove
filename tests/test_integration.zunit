@@ -257,6 +257,31 @@
   assert "$output" same_as 'nord'
 }
 
+@test 'config file value wins over built-in default through trove_init' {
+  # Build a temp TROVE_HOME with a custom trove.conf. trove_init must be COPIED,
+  # not symlinked: it self-locates via ${0:A:h:h}, and :A resolves symlinks back
+  # to the real repo (which would load the shipped trove.conf instead).
+  mkdir -p "${TROVE_TEST_DIR}/prec/lib" "${TROVE_TEST_DIR}/prec/config"
+  cp "${TROVE_HOME}/lib/trove_init.zsh" "${TROVE_TEST_DIR}/prec/lib/"
+  echo ': ${TROVE_COLORSCHEME:=nord}' > "${TROVE_TEST_DIR}/prec/config/trove.conf"
+
+  run zsh -c "unset TROVE_COLORSCHEME; source '${TROVE_TEST_DIR}/prec/lib/trove_init.zsh'; echo \${TROVE_COLORSCHEME}"
+
+  assert $state equals 0
+  assert "$output" same_as 'nord'
+}
+
+@test 'env var wins over config file through trove_init' {
+  mkdir -p "${TROVE_TEST_DIR}/prec/lib" "${TROVE_TEST_DIR}/prec/config"
+  cp "${TROVE_HOME}/lib/trove_init.zsh" "${TROVE_TEST_DIR}/prec/lib/"
+  echo ': ${TROVE_COLORSCHEME:=nord}' > "${TROVE_TEST_DIR}/prec/config/trove.conf"
+
+  run zsh -c "TROVE_COLORSCHEME=gruvbox; source '${TROVE_TEST_DIR}/prec/lib/trove_init.zsh'; echo \${TROVE_COLORSCHEME}"
+
+  assert $state equals 0
+  assert "$output" same_as 'gruvbox'
+}
+
 @test 'config and libraries work together' {
   run zsh -c '
     source ${TROVE_HOME}/config/trove.conf
