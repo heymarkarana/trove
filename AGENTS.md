@@ -27,6 +27,7 @@ Trove is a dependency of dotFiles and Beskar — it is installed first during bo
 | `bin/klog` | CLI logging facade (zsh script) for non-shell callers |
 | `bin/kreq` | CLI requirements facade (zsh script) for non-shell callers |
 | `bin/atlas-env` | Emits neutral `ATLAS_*` discovery exports (cron/system safe) |
+| `tools/` | Static gates — `lint-zsh-syntax.sh`, `lint-zsh-locals.sh`, `identity-scrub.sh` (shared cross-repo identity gate; other repos call it with `--root`) |
 | `tests/` | Test suite (zunit) — run with `bash tests/run_tests.sh` |
 | `examples/` | Usage examples |
 | `docs/API.md` | Full function reference |
@@ -63,6 +64,8 @@ names only; each consumer maps them to its own namespace.
 ### 2. No homelab identity in code
 
 Names specific to any user's environment (codenames, hostnames, usernames, domains, etc.) must not appear in Trove source. Trove is a generic library — it has no knowledge of the environment it is installed in.
+
+`tools/identity-scrub.sh` gates this — for Trove itself and, via `--root <dir>`, for every other repo in the stack (it is the shared gate; dotFiles/Beskar carry no copy). The forbidden-literal list is kept outside all repos: `SCRUB_LITERALS_FILE` if set, else `<install_root>/dotFiles-config/shared/scrub-literals` resolved through Atlas (`bin/atlas-env`).
 
 ### 3. Trove must degrade gracefully
 

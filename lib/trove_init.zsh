@@ -21,14 +21,6 @@ if [[ -r "${TROVE_HOME}/VERSION" ]]; then
 fi
 
 ###############################################################################
-# Environment Configuration
-###############################################################################
-# Set environment defaults (respect existing values)
-: ${TROVE_LOG_LEVEL:=INFO}
-: ${TROVE_COLORSCHEME:=monokai}
-: ${TROVE_OUTPUT_DISPLAY:=true}
-
-###############################################################################
 # PATH Setup
 ###############################################################################
 # Add bin to PATH if not already present
@@ -45,6 +37,15 @@ fi
 if [[ -f "${TROVE_HOME}/config/trove.conf" ]]; then
     source "${TROVE_HOME}/config/trove.conf"
 fi
+
+###############################################################################
+# Environment Configuration
+###############################################################################
+# Last-resort built-in defaults, applied AFTER the config file so the documented
+# precedence holds: environment variable > config file > built-in default.
+: ${TROVE_LOG_LEVEL:=INFO}
+: ${TROVE_COLORSCHEME:=monokai}
+: ${TROVE_OUTPUT_DISPLAY:=true}
 
 ###############################################################################
 # Core Library Loading
